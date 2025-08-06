@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
-    "build": "echo 'No build step required for this project. It runs directly in the browser.'"
+    "build": "mkdir -p public && rsync -a --exclude=public --exclude=.git --exclude=node_modules . public/"
   },
   "devDependencies": {},
   "dependencies": {}
