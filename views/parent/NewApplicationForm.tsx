@@ -1,0 +1,654 @@
+
+import React, { useState, useEffect, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../../hooks/useAuth';
+import { useToast, ToastType } from '../../hooks/useToast';
+import { Student, Edital, ApplicationStatus, ValidationStatus, EditalModalities, Document, Address } from '../../types';
+import { api } from '../../services/mockApi';
+import Card, { CardContent, CardHeader, CardTitle } from '../../components/ui/Card';
+import Button from '../../components/ui/Button';
+import Spinner from '../../components/ui/Spinner';
+import Input from '../../components/ui/Input';
+import Modal from '../../components/ui/Modal';
+import PdfViewer from '../../components/ui/PdfViewer';
+import { IconAlertTriangle, IconUploadCloud, IconFileText, IconX, IconEye, IconBookOpen, IconUserCircle, IconShieldCheck, IconHome, IconInfo } from '../../constants';
+import ApplicationStepper from '../../components/ui/ApplicationStepper';
+
+type OriginFlow = 'PUBLIC' | 'PRIVATE' | null;
+type MainStep = 'MODALIDADE' | 'CANDIDATO' | 'RESPONSAVEL' | 'RESIDENCIA' | 'DOCUMENTOS' | 'REVISAO';
+
+const DocumentUploadSlot = ({
+  docType,
+  files,
+  onFileSelect,
+  onFileRemove,
+  onPreview,
+  addToast,
+}: {
+  docType: { id: string; label: string; required: boolean; multiple: boolean };
+  files: File[];
+  onFileSelect: (id: string, files: File[]) => void;
+  onFileRemove: (id: string, file: File) => void;
+  onPreview: (file: File) => void;
+  addToast: (message: string, type: ToastType) => void;
+}) => {
+  const inputRef = React.useRef<HTMLInputElement>(null);
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files.length > 0) {
+      const selectedFiles = Array.from(e.target.files);
+      const validFiles: File[] = [];
+
+      for (const file of selectedFiles) {
+        if (file.type !== 'application/pdf') {
+          addToast(`Arquivo "${file.name}" inválido. Apenas PDFs são permitidos.`, 'error');
+          continue;
+        }
+        if (file.size > 10 * 1024 * 1024) { // 10MB
+          addToast(`Arquivo "${file.name}" excede o tamanho de 10MB.`, 'error');
+          continue;
+        }
+        validFiles.push(file);
+      }
+      
+      if(validFiles.length > 0) {
+        onFileSelect(docType.id, validFiles);
+      }
+
+      if (inputRef.current) {
+          inputRef.current.value = '';
+      }
+    }
+  };
+  
+  const UploaderBox = () => (
+     <div
+      className="mt-2 p-4 border-2 border-dashed rounded-lg text-center cursor-pointer transition-colors border-gray-300 dark:border-gray-600 hover:border-cep-primary dark:hover:border-cep-primary"
+      onClick={() => inputRef.current?.click()}
+    >
+      <input
+        type="file"
+        ref={inputRef}
+        onChange={handleFileChange}
+        className="hidden"
+        accept="application/pdf"
+        multiple={docType.multiple}
+      />
+      <div className="flex flex-col items-center justify-center">
+        <IconUploadCloud className="w-8 h-8 text-gray-400 dark:text-gray-500" />
+        <p className="mt-1 text-xs text-gray-600 dark:text-gray-400">
+          <span className="font-semibold text-cep-primary">Clique para enviar</span>
+        </p>
+        <p className="text-xs text-gray-500 mt-1">PDF (MAX. 10MB)</p>
+      </div>
+    </div>
+  );
+
+  return (
+    <div className="p-4 border dark:border-slate-700 rounded-lg bg-gray-50/50 dark:bg-slate-800/30">
+      <h4 className="font-medium text-cep-text dark:text-slate-200">
+        {docType.label} {docType.required && <span className="text-red-500">*</span>}
+      </h4>
+      {files.length > 0 && (
+        <ul className="space-y-2 mt-2">
+            {files.map((file, index) => (
+              <li key={index} className="flex items-center text-cep-text dark:text-slate-200 bg-white dark:bg-slate-700 p-2 rounded-md border dark:border-slate-600 text-sm">
+                <IconFileText className="h-5 w-5 mr-3 text-gray-500 dark:text-gray-400 flex-shrink-0" />
+                <span className="flex-1 truncate" title={file.name}>{file.name}</span>
+                <button type="button" onClick={() => onPreview(file)} className="ml-4 p-1 text-gray-400 hover:text-cep-primary rounded-full hover:bg-gray-100 dark:hover:bg-slate-600 transition-colors" aria-label="Visualizar">
+                  <IconEye className="h-5 w-5" />
+                </button>
+                <button type="button" onClick={() => onFileRemove(docType.id, file)} className="ml-2 p-1 text-gray-400 hover:text-red-600 rounded-full hover:bg-red-100 dark:hover:bg-red-900/50 transition-colors" aria-label="Remover">
+                  <IconX className="h-4 w-4" />
+                </button>
+              </li>
+            ))}
+        </ul>
+      )}
+      
+      {(docType.multiple || files.length === 0) && <UploaderBox />}
+    </div>
+  );
+};
+
+
+const NewApplicationForm = () => {
+  const { user, updateUserContext } = useAuth();
+  const navigate = useNavigate();
+  const { addToast } = useToast();
+  
+  const [students, setStudents] = useState<Student[]>([]);
+  const [editais, setEditais] = useState<Edital[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  
+  const [originFlow, setOriginFlow] = useState<OriginFlow>(null);
+  const [mainStep, setMainStep] = useState<MainStep>('MODALIDADE');
+
+  const [cgmInput, setCgmInput] = useState('');
+  const [isSearchingCgm, setIsSearchingCgm] = useState(false);
+  const [cgmError, setCgmError] = useState<string | null>(null);
+  const [showStudentList, setShowStudentList] = useState(false);
+  
+  const [newStudentName, setNewStudentName] = useState('');
+  const [newStudentBirthDate, setNewStudentBirthDate] = useState('');
+
+  const [contactEmail, setContactEmail] = useState(user?.email || '');
+  const [contactPhone, setContactPhone] = useState(user?.phone || '');
+  
+  const [isCepLoading, setIsCepLoading] = useState(false);
+  const [address, setAddress] = useState<Address>({
+      cep: '',
+      street: '',
+      number: '',
+      complement: '',
+      neighborhood: '',
+      city: 'Curitiba',
+  });
+
+  const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
+  const [selectedEdital, setSelectedEdital] = useState<Edital | null>(null);
+  const [hasSpecialNeeds, setHasSpecialNeeds] = useState(false);
+  const [siblingCgm, setSiblingCgm] = useState('');
+  const [docFiles, setDocFiles] = useState<Record<string, File[]>>({});
+  const [ageWarning, setAgeWarning] = useState<string | null>(null);
+  
+  const [termsAccepted, setTermsAccepted] = useState(false);
+  const [reviewAccepted, setReviewAccepted] = useState(false);
+  const [previewFile, setPreviewFile] = useState<File | null>(null);
+  const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
+
+  const activeSteps = useMemo(() => {
+    const allSteps: { id: MainStep, label: string, icon: React.ReactNode }[] = [
+        { id: 'MODALIDADE', label: 'Modalidade', icon: <IconBookOpen /> },
+        { id: 'CANDIDATO', label: 'Candidato', icon: <IconUserCircle /> },
+        { id: 'RESPONSAVEL', label: 'Responsável', icon: <IconShieldCheck /> },
+        { id: 'RESIDENCIA', label: 'Residência', icon: <IconHome /> },
+        { id: 'DOCUMENTOS', label: 'Documentos', icon: <IconFileText /> },
+        { id: 'REVISAO', label: 'Revisão', icon: <IconEye /> },
+    ];
+    if (originFlow === 'PRIVATE') {
+        return allSteps;
+    }
+    return allSteps.filter(step => step.id !== 'RESIDENCIA');
+  }, [originFlow]);
+
+  useEffect(() => {
+    if (user) {
+      setIsLoading(true);
+      Promise.all([
+        api.getStudentsByResponsible(user.cpf),
+        api.getEditais()
+      ]).then(([studentData, editalData]) => {
+        setStudents(studentData);
+        setEditais(editalData);
+      }).finally(() => setIsLoading(false));
+    }
+  }, [user]);
+  
+  useEffect(() => {
+    if (selectedStudent && selectedEdital && selectedEdital.modality === EditalModalities.FUNDAMENTAL_6_ANO) {
+        const birthYear = new Date(selectedStudent.birthDate).getFullYear();
+        const currentYear = new Date().getFullYear();
+        const age = currentYear - birthYear;
+        if (age < 10) setAgeWarning('A idade está abaixo da prevista em edital.');
+        else if (age > 11) setAgeWarning('A idade está acima da prevista em edital.');
+        else setAgeWarning(null);
+    } else {
+        setAgeWarning(null);
+    }
+  }, [selectedStudent, selectedEdital]);
+
+  const allDocTypes = useMemo(() => {
+    let docs: { id: string; label: string; required: boolean; multiple: boolean }[] = [];
+
+    // Private school specific documents
+    if (originFlow === 'PRIVATE') {
+      docs.push(
+        { id: 'rg_frente', label: 'RG (Frente)', required: true, multiple: false },
+        { id: 'rg_verso', label: 'RG (Verso)', required: true, multiple: false },
+      );
+    }
+
+    // Common documents for both flows
+    const commonDocs = [
+      { id: 'certidao', label: 'Certidão de nascimento', required: true, multiple: false },
+      { id: 'residencia', label: 'Comprovante de residência', required: originFlow === 'PRIVATE', multiple: false },
+      { id: 'boletins', label: 'Boletins do 1º ao 5º ano', required: true, multiple: true },
+      { id: 'declaracao', label: 'Declaração de matrícula', required: true, multiple: false },
+    ];
+    
+    docs.push(...commonDocs);
+
+    // Special needs document
+    docs.push({ id: 'laudo', label: 'Laudo médico (se aplicável)', required: hasSpecialNeeds, multiple: false });
+    
+    // Custom requirements from edital
+    if (selectedEdital?.customRequirements) {
+        const customDocs = selectedEdital.customRequirements.map(req => ({
+            id: req.id,
+            label: req.label,
+            required: true,
+            multiple: false,
+        }));
+        docs.push(...customDocs);
+    }
+    
+    return docs;
+  }, [originFlow, hasSpecialNeeds, selectedEdital]);
+  
+  const handleNextStep = () => {
+    const currentIndex = activeSteps.findIndex(s => s.id === mainStep);
+    if (currentIndex < activeSteps.length - 1) setMainStep(activeSteps[currentIndex + 1].id);
+  };
+  
+  const handlePrevStep = () => {
+    const currentIndex = activeSteps.findIndex(s => s.id === mainStep);
+    if (currentIndex > 0) setMainStep(activeSteps[currentIndex - 1].id);
+    else setOriginFlow(null); // Go back to origin choice
+  };
+
+  const handleFileSelect = (id: string, newFiles: File[]) => {
+    const isMultiple = allDocTypes.find(d => d.id === id)?.multiple || false;
+    setDocFiles(prev => ({ ...prev, [id]: isMultiple ? [...(prev[id] || []), ...newFiles] : [newFiles[0]] }));
+  };
+
+  const handleFileRemove = (id: string, fileToRemove: File) => {
+    setDocFiles(prev => ({...prev, [id]: (prev[id] || []).filter(f => f !== fileToRemove)}));
+  };
+
+  const handleAddressChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+      const { name, value } = e.target;
+      setAddress(prev => ({ ...prev, [name]: value }));
+  };
+
+  const handleCepSearch = async (cep: string) => {
+    const cleanedCep = cep.replace(/\D/g, '');
+    setAddress(prev => ({ ...prev, cep: cleanedCep }));
+
+    if (cleanedCep.length === 8) {
+        setIsCepLoading(true);
+        try {
+            const response = await fetch(`https://viacep.com.br/ws/${cleanedCep}/json/`);
+            if (!response.ok) {
+                throw new Error('Erro ao buscar CEP. Tente novamente.');
+            }
+            const data = await response.json();
+            if (data.erro) {
+                addToast('CEP não encontrado ou inválido.', 'error');
+                setAddress(prev => ({ ...prev, street: '', neighborhood: '', city: '' }));
+            } else {
+                setAddress(prev => ({
+                    ...prev,
+                    street: data.logradouro,
+                    neighborhood: data.bairro,
+                    city: data.localidade,
+                }));
+                addToast('Endereço preenchido automaticamente.', 'success');
+            }
+        } catch (error) {
+            addToast(error instanceof Error ? error.message : 'Falha na comunicação com o serviço de CEP.', 'error');
+        } finally {
+            setIsCepLoading(false);
+        }
+    }
+  };
+
+
+  const handleResidenceSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!address.cep || !address.street || !address.number || !address.neighborhood || !address.city) {
+        addToast('Por favor, preencha todos os campos de endereço obrigatórios.', 'error');
+        return;
+    }
+    handleNextStep();
+  };
+
+  const handleFindStudentByCgm = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!cgmInput || !user) return;
+    setIsSearchingCgm(true);
+    setCgmError(null);
+    try {
+        const student = await api.findStudentByCgm(cgmInput, user.cpf);
+        if (student) {
+            setSelectedStudent(student);
+            addToast(`Aluno ${student.name} encontrado.`, 'success');
+            handleNextStep();
+        } else {
+            setCgmError('CGM não encontrado ou não pertence a um de seus filhos.');
+        }
+    } catch (err) {
+        setCgmError('Ocorreu um erro ao buscar o aluno.');
+    } finally {
+        setIsSearchingCgm(false);
+    }
+  };
+
+  const handleCreatePrivateStudent = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newStudentName || !newStudentBirthDate || !user) return;
+    setIsSubmitting(true);
+    try {
+      const newStudent = await api.createStudent(newStudentName, newStudentBirthDate, user.cpf);
+      setStudents(prev => [...prev, newStudent]);
+      setSelectedStudent(newStudent);
+      addToast(`Aluno ${newStudent.name} cadastrado.`, 'success');
+      handleNextStep();
+    } catch (err) {
+      addToast(err instanceof Error ? err.message : 'Erro ao cadastrar aluno', 'error');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+  
+  const handleConfirmContact = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!user) return;
+    if (!contactEmail.includes('@') || contactPhone.replace(/\D/g, '').length < 10) {
+        addToast('Por favor, insira um e-mail e telefone válidos.', 'error');
+        return;
+    }
+    setIsSubmitting(true);
+    try {
+        await api.updateUser(user.id, { email: contactEmail, phone: contactPhone });
+        updateUserContext({ email: contactEmail, phone: contactPhone });
+        addToast('Dados de contato atualizados!', 'success');
+        handleNextStep();
+    } catch(err) {
+        addToast(err instanceof Error ? err.message : 'Erro ao atualizar contato.', 'error');
+    } finally {
+        setIsSubmitting(false);
+    }
+  };
+
+  const handleSubmit = async () => {
+    if (!selectedStudent || !selectedEdital) return;
+    setIsSubmitting(true);
+    try {
+      const newApplication = await api.createApplication(selectedStudent.id, selectedEdital.id, hasSpecialNeeds, siblingCgm);
+      const filesToUpload = Object.values(docFiles).flat();
+      const documentsForApp: Document[] = filesToUpload.map((file, i) => ({
+        id: `d-new-${Date.now()}-${i}`,
+        fileName: file.name, fileType: file.type,
+        fileUrl: URL.createObjectURL(file), // MOCK
+        validationStatus: ValidationStatus.PENDENTE
+      }));
+      
+      const finalApplication = await api.updateApplication(newApplication.id, {
+        documents: documentsForApp,
+        status: ApplicationStatus.EM_ANALISE,
+        address: originFlow === 'PRIVATE' ? address : undefined,
+      });
+
+      // Send notification email in the background
+      const sendNotificationEmail = async () => {
+        if (!selectedStudent) return;
+        
+        const formData = new FormData();
+        formData.append('_subject', `Nova Inscrição Recebida: ${selectedStudent.name}`);
+        formData.append('_template', 'table');
+        formData.append('Candidato', selectedStudent.name);
+        formData.append('Protocolo', finalApplication.protocol);
+        formData.append('Edital', `${finalApplication.edital.number} - ${finalApplication.edital.modality}`);
+        formData.append('Data de Envio', new Date(finalApplication.submissionDate).toLocaleString('pt-BR'));
+        formData.append('Mensagem', 'A inscrição foi recebida com sucesso e está aguardando análise.');
+        formData.append('_captcha', 'false');
+
+        try {
+          const response = await fetch('https://formsubmit.co/nicolas.vendrami@gmail.com', {
+            method: 'POST',
+            headers: {
+              'Accept': 'application/json'
+            },
+            body: formData,
+          });
+          const data = await response.json();
+          console.log('Resposta do serviço de e-mail:', data);
+        } catch (emailError) {
+          console.error("Falha ao enviar e-mail de notificação:", emailError);
+          // Do not block user flow or show an error toast.
+        }
+      };
+
+      sendNotificationEmail();
+
+      addToast('Inscrição realizada com sucesso!', 'success');
+      navigate(`/inscricao/${finalApplication.id}`);
+    } catch (err) {
+      addToast(err instanceof Error ? err.message : 'Erro ao criar inscrição.', 'error');
+      setIsSubmitting(false);
+    }
+  };
+  
+  if (isLoading) {
+    return <div className="flex justify-center items-center h-full"><Spinner /></div>;
+  }
+  
+  const renderStepContent = () => {
+    switch(mainStep) {
+      case 'MODALIDADE':
+        return (
+          <Card>
+            <CardHeader><CardTitle>1. Seleção de Modalidade (Edital)</CardTitle><p className="text-sm text-gray-500 dark:text-gray-400 mt-1">Escolha o edital para o qual deseja inscrever o candidato.</p></CardHeader>
+            <CardContent>
+                <div className="grid md:grid-cols-2 gap-4 mt-4">
+                    {editais.map(edital => (
+                        <div key={edital.id} onClick={() => setSelectedEdital(edital)} className={`p-4 border dark:border-slate-700 rounded-lg cursor-pointer transition-all ${selectedEdital?.id === edital.id ? 'ring-2 ring-cep-primary bg-cep-primary/5 dark:bg-cep-primary/10' : 'hover:shadow-md dark:hover:bg-slate-700/50'}`}>
+                            <h3 className="font-bold text-lg text-cep-primary">{edital.modality}</h3>
+                            <p className="text-sm text-gray-600 dark:text-gray-400">Edital nº {edital.number}</p>
+                            <p className="text-sm text-gray-500 dark:text-gray-400">Vagas: {edital.vacancyDetails.reduce((sum, v) => sum + v.count, 0)}</p>
+                            <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">Inscrições: {new Date(edital.inscriptionStart).toLocaleDateString()} a {new Date(edital.inscriptionEnd).toLocaleDateString()}</p>
+                        </div>
+                    ))}
+                </div>
+                <div className="flex justify-end mt-6 pt-4 border-t dark:border-slate-700"><Button onClick={handleNextStep} disabled={!selectedEdital}>Continuar</Button></div>
+            </CardContent>
+          </Card>
+        );
+      case 'CANDIDATO':
+        if (originFlow === 'PUBLIC') return (
+            <Card>
+              <CardHeader><CardTitle>2. Seleção do Candidato (Rede Pública)</CardTitle></CardHeader>
+              <CardContent>
+                {!showStudentList ? (
+                  <form onSubmit={handleFindStudentByCgm} className="space-y-4">
+                    <p className="text-sm text-gray-500 dark:text-gray-400">Digite o CGM (Código Geral de Matrícula) do aluno.</p>
+                    <Input id="cgm" label="CGM do Aluno" value={cgmInput} onChange={e => { setCgmInput(e.target.value.replace(/\D/g, '')); setCgmError(null); }} error={cgmError || undefined} required />
+                    <div className="flex items-center justify-between"><button type="button" className="text-sm text-cep-primary hover:underline" onClick={() => setShowStudentList(true)}>Não sei o CGM, selecionar da lista</button><Button type="submit" isLoading={isSearchingCgm}>Buscar Aluno</Button></div>
+                  </form>
+                ) : (
+                  <div className="space-y-4">
+                    <p className="text-sm text-gray-500 dark:text-gray-400">Selecione o aluno da lista.</p>
+                    <div className="grid md:grid-cols-2 gap-4">
+                        {students.filter(s => s.cgm).map(student => (
+                            <div key={student.id} onClick={() => setSelectedStudent(student)} className={`p-4 border dark:border-slate-700 rounded-lg cursor-pointer transition-all ${selectedStudent?.id === student.id ? 'ring-2 ring-cep-primary bg-cep-primary/5 dark:bg-cep-primary/10' : 'hover:shadow-md dark:hover:bg-slate-700/50'}`}>
+                                <h3 className="font-semibold text-cep-text dark:text-slate-200">{student.name}</h3>
+                                <p className="text-sm text-gray-500 dark:text-gray-400">CGM: {student.cgm}</p>
+                                <p className="text-sm text-gray-500 dark:text-gray-400">Nascimento: {new Date(student.birthDate).toLocaleDateString()}</p>
+                            </div>
+                        ))}
+                    </div>
+                    <div className="flex items-center justify-between mt-4 pt-4 border-t dark:border-slate-700"><button type="button" className="text-sm text-cep-primary hover:underline" onClick={() => setShowStudentList(false)}>Buscar por CGM</button><Button onClick={handleNextStep} disabled={!selectedStudent}>Continuar</Button></div>
+                  </div>
+                )}
+                 <div className="flex justify-start mt-6 pt-4 border-t dark:border-slate-700"><Button onClick={handlePrevStep} variant='secondary'>Voltar</Button></div>
+              </CardContent>
+            </Card>
+        );
+        if (originFlow === 'PRIVATE') return (
+            <Card>
+              <CardHeader><CardTitle>2. Cadastro do Candidato (Escola Particular)</CardTitle><p className="text-sm text-gray-500 dark:text-gray-400 mt-1">Preencha os dados do aluno.</p></CardHeader>
+              <CardContent>
+                <form onSubmit={handleCreatePrivateStudent} className="space-y-4">
+                  <Input id="newStudentName" label="Nome Completo do Aluno" value={newStudentName} onChange={e => setNewStudentName(e.target.value)} required />
+                  <Input id="newStudentBirthDate" label="Data de Nascimento" type="date" value={newStudentBirthDate} onChange={e => setNewStudentBirthDate(e.target.value)} required />
+                  <div className="flex justify-between mt-6 pt-4 border-t dark:border-slate-700"><Button onClick={handlePrevStep} variant='secondary'>Voltar</Button><Button type="submit" isLoading={isSubmitting}>Salvar e Continuar</Button></div>
+                </form>
+              </CardContent>
+            </Card>
+        );
+        return null;
+      case 'RESPONSAVEL':
+        return(
+            <Card>
+              <CardHeader>
+                <div className="flex items-center gap-2">
+                    <CardTitle>3. Contato do Responsável</CardTitle>
+                    <div className="group relative flex items-center">
+                        <IconInfo className="h-5 w-5 text-slate-400 dark:text-slate-500 cursor-help" />
+                        <div className="absolute bottom-full left-1/2 -translate-x-1/2 z-10 mb-2 w-72 p-3 bg-slate-700 dark:bg-slate-800 text-white dark:text-slate-200 text-xs font-normal rounded-lg shadow-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
+                            Essas informações não serão atualizadas no SERE, são apenas para uso do sistema.
+                        </div>
+                    </div>
+                </div>
+                <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">Confirme ou atualize seus dados de contato.</p>
+              </CardHeader>
+              <CardContent>
+                <form onSubmit={handleConfirmContact} className="space-y-4">
+                  <Input id="responsibleCpf" label="CPF do Responsável" value={user?.cpf || ''} disabled />
+                  <Input id="contactEmail" label="E-mail do Responsável" type="email" value={contactEmail} onChange={e => setContactEmail(e.target.value)} required />
+                  <Input id="contactPhone" label="Telefone com DDD" type="tel" value={contactPhone} onChange={e => setContactPhone(e.target.value)} required placeholder="(XX) XXXXX-XXXX" />
+                  <div className="flex justify-between mt-6 pt-4 border-t dark:border-slate-700"><Button onClick={handlePrevStep} variant='secondary'>Voltar</Button><Button type="submit" isLoading={isSubmitting}>Confirmar e Continuar</Button></div>
+                </form>
+              </CardContent>
+            </Card>
+        );
+      case 'RESIDENCIA':
+        return (
+            <Card>
+                <CardHeader><CardTitle>4. Endereço do Candidato</CardTitle><p className="text-sm text-gray-500 dark:text-gray-400 mt-1">Informe o CEP e confirme o endereço residencial do candidato.</p></CardHeader>
+                <CardContent>
+                    <form onSubmit={handleResidenceSubmit} className="space-y-4">
+                        <div className="relative">
+                            <Input
+                                id="cep"
+                                name="cep"
+                                label="CEP"
+                                value={address.cep}
+                                onChange={(e) => handleCepSearch(e.target.value)}
+                                maxLength={8}
+                                placeholder="Apenas números"
+                                required
+                            />
+                            {isCepLoading && (
+                                <div className="absolute right-3 top-8">
+                                    <Spinner size="sm" />
+                                </div>
+                            )}
+                        </div>
+
+                        <Input id="street" name="street" label="Nome da Rua" value={address.street} onChange={handleAddressChange} required />
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                            <Input id="number" name="number" label="Número" value={address.number} onChange={handleAddressChange} required className="sm:col-span-1" />
+                            <Input id="complement" name="complement" label="Complemento" value={address.complement || ''} onChange={handleAddressChange} className="sm:col-span-2" placeholder="Apto, bloco, casa" />
+                        </div>
+                        <Input id="neighborhood" name="neighborhood" label="Bairro" value={address.neighborhood} onChange={handleAddressChange} required />
+                        <Input id="city" name="city" label="Município" value={address.city} onChange={handleAddressChange} required />
+                        <div className="flex justify-between mt-6 pt-4 border-t dark:border-slate-700">
+                            <Button type="button" onClick={handlePrevStep} variant='secondary'>Voltar</Button>
+                            <Button type="submit">Continuar</Button>
+                        </div>
+                    </form>
+                </CardContent>
+            </Card>
+        );
+      case 'DOCUMENTOS':
+        return (
+          <Card>
+            <CardHeader><CardTitle>5. Envio de Documentos</CardTitle></CardHeader>
+            <CardContent className="space-y-6">
+                {ageWarning && <div className="p-3 bg-yellow-50 dark:bg-yellow-900/40 border-l-4 border-yellow-400 dark:border-yellow-600 text-yellow-700 dark:text-yellow-200 flex items-center"><IconAlertTriangle className="h-5 w-5 mr-3" /><p className="text-sm">{ageWarning}</p></div>}
+                <Input id="siblingCgm" label="CGM do Irmão (critério de desempate)" value={siblingCgm} onChange={e => setSiblingCgm(e.target.value)} placeholder="Opcional" />
+                <div className="relative flex items-start"><div className="flex h-5 items-center"><input id="specialNeeds" type="checkbox" className="h-4 w-4 rounded border-gray-300 dark:border-slate-600 text-cep-primary focus:ring-cep-primary" checked={hasSpecialNeeds} onChange={(e) => setHasSpecialNeeds(e.target.checked)} /></div><div className="ml-3 text-sm"><label htmlFor="specialNeeds" className="font-medium text-cep-text dark:text-slate-200">Candidato concorre em modalidade de Educação Especial?</label></div></div>
+                <div className="space-y-4">
+                    {allDocTypes.filter(dt => dt.required).map(docType => (
+                        <DocumentUploadSlot key={docType.id} docType={docType} files={docFiles[docType.id] || []} onFileSelect={handleFileSelect} onFileRemove={handleFileRemove} onPreview={setPreviewFile} addToast={addToast} />
+                    ))}
+                </div>
+                <div className="flex justify-between mt-6 pt-4 border-t dark:border-slate-700"><Button onClick={handlePrevStep} variant='secondary'>Voltar</Button><Button onClick={handleNextStep}>Continuar para Revisão</Button></div>
+            </CardContent>
+          </Card>
+        );
+    case 'REVISAO':
+        const requiredDocs = allDocTypes.filter(d => d.required);
+        const requiredDocsUploaded = requiredDocs.every(dt => docFiles[dt.id] && docFiles[dt.id].length > 0);
+        return(
+            <Card>
+                <CardHeader><CardTitle>6. Revisão da Inscrição</CardTitle><p className="text-sm text-gray-500 dark:text-gray-400 mt-1">Confira todos os dados antes de finalizar.</p></CardHeader>
+                <CardContent className="space-y-6">
+                    <div className="space-y-4">
+                        <div><h4 className="font-semibold text-lg text-cep-text dark:text-white">Modalidade</h4><p>{selectedEdital?.number} - {selectedEdital?.modality}</p></div>
+                        <div><h4 className="font-semibold text-lg text-cep-text dark:text-white">Candidato</h4><p>{selectedStudent?.name}</p><p className="text-sm text-gray-500 dark:text-gray-400">Nascimento: {selectedStudent ? new Date(selectedStudent.birthDate).toLocaleDateString() : ''}</p></div>
+                        <div><h4 className="font-semibold text-lg text-cep-text dark:text-white">Responsável</h4><p>{user?.name}</p><p className="text-sm text-gray-500 dark:text-gray-400">Email: {contactEmail} | Telefone: {contactPhone}</p></div>
+                        {originFlow === 'PRIVATE' && (
+                            <div>
+                                <h4 className="font-semibold text-lg text-cep-text dark:text-white">Endereço</h4>
+                                <div className="text-sm text-gray-600 dark:text-gray-400 space-y-1">
+                                    <p>CEP: {address.cep}</p>
+                                    <p>
+                                        {address.street}, {address.number} {address.complement && `- ${address.complement}`}
+                                    </p>
+                                    <p>
+                                        {address.neighborhood} - {address.city}
+                                    </p>
+                                </div>
+                            </div>
+                        )}
+                        <div><h4 className="font-semibold text-lg text-cep-text dark:text-white">Documentos</h4><ul className="list-disc list-inside">{Object.values(docFiles).flat().map(f => <li key={f.name} className="text-sm">{f.name}</li>)}</ul></div>
+                    </div>
+                    <div className="pt-6 border-t border-gray-200 dark:border-slate-700 space-y-4">
+                      <div className="flex items-start"><input id="terms" type="checkbox" checked={termsAccepted} onChange={e => setTermsAccepted(e.target.checked)} className="h-4 w-4 mt-1 rounded border-gray-300 dark:border-slate-600 text-cep-primary focus:ring-cep-primary" /><label htmlFor="terms" className="ml-2 block text-sm text-cep-text dark:text-slate-300">Declaro que li e concordo com os termos do edital e que as informações prestadas são verdadeiras. <span className="text-red-500">*</span></label></div>
+                      <div className="flex items-start"><input id="review" type="checkbox" checked={reviewAccepted} onChange={e => setReviewAccepted(e.target.checked)} className="h-4 w-4 mt-1 rounded border-gray-300 dark:border-slate-600 text-cep-primary focus:ring-cep-primary" /><label htmlFor="review" className="ml-2 block text-sm text-cep-text dark:text-slate-300">Declaro que revisei os documentos e confirmo o envio correto dos mesmos. <span className="text-red-500">*</span></label></div>
+                    </div>
+                    <div className="flex justify-between mt-6 pt-4 border-t dark:border-slate-700"><Button onClick={handlePrevStep} variant='secondary'>Voltar</Button><Button onClick={() => setIsConfirmModalOpen(true)} disabled={!termsAccepted || !reviewAccepted || !requiredDocsUploaded}>Finalizar Inscrição</Button></div>
+                </CardContent>
+            </Card>
+        );
+      default: return null;
+    }
+  }
+
+  return (
+    <div className="space-y-6 max-w-5xl mx-auto">
+      <h1 className="text-3xl font-bold text-cep-text dark:text-white">Nova Inscrição</h1>
+      
+      {!originFlow ? (
+          <Card>
+            <CardHeader>
+              <CardTitle>Origem do Aluno</CardTitle>
+              <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">Selecione se o aluno já pertence à rede pública estadual (possui CGM) ou vem de uma escola particular.</p>
+            </CardHeader>
+            <CardContent className="grid md:grid-cols-2 gap-6 pt-6">
+              <Button size="lg" onClick={() => setOriginFlow('PUBLIC')}>Aluno da Rede Pública (SERE)</Button>
+              <Button size="lg" variant="secondary" onClick={() => setOriginFlow('PRIVATE')}>Aluno de Escola Particular</Button>
+            </CardContent>
+          </Card>
+      ) : (
+        <>
+            <ApplicationStepper steps={activeSteps} currentStepId={mainStep} />
+            <div className="mt-8">
+                {renderStepContent()}
+            </div>
+        </>
+      )}
+
+      {previewFile && (
+        <Modal isOpen={!!previewFile} onClose={() => setPreviewFile(null)} title={`Visualizando: ${previewFile.name}`} size="5xl">
+          <div className="w-full h-[75vh]"><PdfViewer fileUrl={URL.createObjectURL(previewFile)} /></div>
+        </Modal>
+      )}
+      <Modal isOpen={isConfirmModalOpen} onClose={() => setIsConfirmModalOpen(false)} title="Confirmar Envio">
+        <div>
+            <p className="text-gray-600 dark:text-gray-400">Tem certeza que deseja finalizar e enviar a inscrição? Após a confirmação, você não poderá editar os dados até que uma análise seja feita.</p>
+            <div className="flex justify-end gap-2 pt-6 mt-4 border-t dark:border-slate-700">
+                <Button variant="secondary" onClick={() => setIsConfirmModalOpen(false)} disabled={isSubmitting}>Cancelar</Button>
+                <Button onClick={handleSubmit} isLoading={isSubmitting}>Confirmar Inscrição</Button>
+            </div>
+        </div>
+      </Modal>
+    </div>
+  );
+};
+
+export default NewApplicationForm;

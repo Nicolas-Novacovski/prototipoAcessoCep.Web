@@ -1,0 +1,6 @@
+{
+  "name": "Sistema Acesso CEP",
+  "description": "Uma plataforma unificada para gerenciar processos classificatórios para ingresso de novos estudantes no Colégio Estadual do Paraná (CEP). O sistema abrange múltiplos editais, desde a inscrição e análise curricular até a confirmação da vaga, incluindo análise documental, conversão de pareceres, classificação automática e gestão de recursos.",
+  "requestFramePermissions": [],
+  "prompt": ""
+}
