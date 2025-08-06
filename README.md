@@ -26,18 +26,18 @@ O sistema é projetado para atender às necessidades de diferentes perfis de usu
 
 ## 🚀 Technology Stack
 
-Este é um projeto puramente de frontend que utiliza uma arquitetura moderna **sem a necessidade de um passo de compilação (build)**. Ele carrega suas dependências como módulos ES diretamente no navegador, o que simplifica o desenvolvimento e a implantação.
+Este é um projeto puramente de frontend, utilizando tecnologias modernas para criar uma experiência de usuário rica e interativa sem a necessidade de um backend dedicado (os dados são mockados).
 
 - **React 19:** Para a construção da interface de usuário.
-- **TypeScript:** Para tipagem estática e um código mais robusto (verificado pelo seu editor, mas não compilado separadamente).
+- **TypeScript:** Para tipagem estática e um código mais robusto.
 - **React Router:** Para o roteamento do lado do cliente em uma Single Page Application (SPA).
-- **Tailwind CSS:** Utilizado via CDN para estilização rápida e consistente.
+- **Tailwind CSS:** Para a estilização rápida e consistente.
 - **pdfjs-dist:** Para a renderização e visualização de documentos PDF diretamente no navegador.
-- **ESM Modules (via esm.sh):** As dependências são carregadas via `importmap` no `index.html`, eliminando a necessidade de `npm install` ou de ferramentas como Webpack/Vite.
+- **ESM Modules (via esm.sh):** O projeto carrega suas dependências diretamente no navegador, eliminando a necessidade de um passo de build local.
 
 ## ⚙️ Running the Project
 
-Como o projeto não requer um processo de build, a execução é muito simples.
+Como o projeto utiliza import maps e carrega módulos ES via CDN (`esm.sh`), não há necessidade de `npm install` ou de um processo de build complexo como Webpack ou Vite.
 
 1.  **Clone o repositório:**
     ```bash
@@ -45,7 +45,7 @@ Como o projeto não requer um processo de build, a execução é muito simples.
     ```
 
 2.  **Inicie um servidor local:**
-    Você pode usar qualquer servidor estático. Uma opção simples é o `live-server` do Node.js, que pode ser executado com `npx`.
+    Você pode usar qualquer servidor estático. Uma opção simples é o `live-server`, que pode ser executado com o `npx`.
 
     ```bash
     npx live-server
@@ -55,11 +55,4 @@ Como o projeto não requer um processo de build, a execução é muito simples.
 
 ## ☁️ Deployment (Vercel)
 
-Este projeto está pronto para ser implantado na Vercel. A configuração necessária para uma SPA (Single Page Application) está definida no arquivo `vercel.json`. Basta conectar seu repositório Git à Vercel e usar as seguintes configurações:
-
-- **Framework Preset:** `Other`
-- **Build Command:** (deixe em branco)
-- **Output Directory:** (deixe em branco)
-- **Install Command:** (deixe em branco)
-
-A Vercel fará o deploy automático dos arquivos estáticos.
+Este projeto está pronto para ser implantado na Vercel. A configuração necessária para uma SPA (Single Page Application) está definida no arquivo `vercel.json`. Basta conectar seu repositório Git à Vercel para fazer o deploy automático.
