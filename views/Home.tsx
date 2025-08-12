@@ -1,11 +1,15 @@
 
+
+
+
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../services/mockApi';
-import { Edital } from '../types';
+import { Edital, ComplementaryCall } from '../types';
 import Spinner from '../components/ui/Spinner';
-import { IconChevronDown, IconBuilding, IconSun, IconUserCircle, IconArrowRight, IconMoon } from '../constants';
+import { IconChevronDown, IconBuilding, IconSun, IconUserCircle, IconArrowRight, IconMoon, IconFileText } from '../constants';
 import { useTheme } from '../hooks/useTheme';
+import Modal from '../components/ui/Modal';
 
 const FaqItem = ({ question, children }: { question: string, children: React.ReactNode }) => (
     <details className="p-4 rounded-lg bg-slate-50 border border-slate-200 group transition-all duration-300 dark:bg-slate-800/50 dark:border-slate-700">
@@ -67,16 +71,22 @@ const CountdownTimer = ({ endDate }: { endDate: string }) => {
 
 const Home = () => {
     const [editais, setEditais] = useState<Edital[]>([]);
+    const [complementaryCalls, setComplementaryCalls] = useState<ComplementaryCall[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const navigate = useNavigate();
     const [openEdital, setOpenEdital] = useState<Edital | null>(null);
     const { theme, toggleTheme } = useTheme();
 
+    const [isCallsModalOpen, setIsCallsModalOpen] = useState(false);
+    const [selectedEditalCalls, setSelectedEditalCalls] = useState<ComplementaryCall[]>([]);
+
     useEffect(() => {
-        api.getEditais()
-            .then(data => {
-                setEditais(data);
-                const currentlyOpen = data.find(edital => {
+        Promise.all([api.getEditais(), api.getComplementaryCalls()])
+            .then(([editalData, callData]) => {
+                const activeEditais = editalData.filter(e => e.isActive);
+                setEditais(activeEditais);
+                setComplementaryCalls(callData);
+                const currentlyOpen = activeEditais.find(edital => {
                     const now = new Date();
                     const start = new Date(edital.inscriptionStart);
                     const end = new Date(edital.inscriptionEnd);
@@ -96,6 +106,11 @@ const Home = () => {
         if (editaisSection) {
             editaisSection.scrollIntoView({ behavior: 'smooth' });
         }
+    };
+    
+    const openCallsModal = (calls: ComplementaryCall[]) => {
+        setSelectedEditalCalls(calls);
+        setIsCallsModalOpen(true);
     };
 
     return (
@@ -167,41 +182,61 @@ const Home = () => {
                             <p className="mt-2 text-slate-600 dark:text-slate-400">Informações detalhadas sobre os processos seletivos abertos e futuros.</p>
                         </div>
                         {isLoading ? <Spinner /> : (
-                            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
-                                {editais.map(edital => {
-                                    const isOpen = isEditalOpen(edital);
-                                    return (
-                                        <div key={edital.id} className="bg-slate-50 dark:bg-slate-800 p-6 rounded-xl shadow-lg flex flex-col transition-transform hover:-translate-y-1 border border-slate-200 dark:border-slate-700">
-                                            <div className="flex justify-between items-start">
-                                                <span className="text-xs font-bold uppercase tracking-wider text-cep-primary dark:text-cep-accent">{edital.modality}</span>
-                                                <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
-                                                    isOpen 
-                                                    ? 'bg-teal-100 text-teal-800 dark:bg-teal-200 dark:text-teal-900' 
-                                                    : 'bg-slate-200 text-slate-800 dark:bg-slate-600 dark:text-slate-300'
-                                                }`}>
-                                                    {isOpen ? 'Aberto' : 'Fechado'}
-                                                </span>
+                            editais.length > 0 ? (
+                                <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
+                                    {editais.map(edital => {
+                                        const isOpen = isEditalOpen(edital);
+                                        const now = new Date();
+                                        const activeCalls = complementaryCalls.filter(c => 
+                                            c.editalId === edital.id && 
+                                            now >= new Date(c.startDate)
+                                        );
+                                        return (
+                                            <div key={edital.id} className="bg-slate-50 dark:bg-slate-800 p-6 rounded-xl shadow-lg flex flex-col transition-transform hover:-translate-y-1 border border-slate-200 dark:border-slate-700">
+                                                <div className="flex justify-between items-start">
+                                                    <span className="text-xs font-bold uppercase tracking-wider text-cep-primary dark:text-cep-accent">{edital.modality}</span>
+                                                    <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
+                                                        isOpen 
+                                                        ? 'bg-teal-100 text-teal-800 dark:bg-teal-200 dark:text-teal-900' 
+                                                        : 'bg-slate-200 text-slate-800 dark:bg-slate-600 dark:text-slate-300'
+                                                    }`}>
+                                                        {isOpen ? 'Aberto' : 'Fechado'}
+                                                    </span>
+                                                </div>
+                                                <h3 className="text-xl font-semibold mt-2 text-cep-text dark:text-white">Edital {edital.number}</h3>
+                                                <div className="mt-4 text-sm text-slate-600 dark:text-slate-300 space-y-2 flex-grow">
+                                                    <p><span className="font-semibold text-slate-800 dark:text-slate-100">Vagas:</span> {edital.vacancyDetails.reduce((sum, v) => sum + v.count, 0)}</p>
+                                                    <p><span className="font-semibold text-slate-800 dark:text-slate-100">Inscrições:</span> {new Date(edital.inscriptionStart).toLocaleDateString('pt-BR')} a {new Date(edital.inscriptionEnd).toLocaleDateString('pt-BR')}</p>
+                                                </div>
+                                                <div className="mt-6">
+                                                    {activeCalls.length > 0 ? (
+                                                        <button 
+                                                            onClick={() => openCallsModal(activeCalls)}
+                                                            className="w-full bg-blue-600 hover:bg-blue-700 text-white py-2 rounded-lg font-bold transition-colors"
+                                                        >
+                                                            Ver Chamadas Complementares
+                                                        </button>
+                                                    ) : isOpen ? (
+                                                         <button onClick={() => navigate('/login')} className="w-full bg-cep-primary hover:bg-cep-secondary text-white py-2 rounded-lg font-bold transition-colors">
+                                                            Inscrever-se
+                                                         </button>
+                                                    ) : (
+                                                        <button className="w-full bg-slate-200 text-slate-500 dark:bg-slate-700 dark:text-slate-400 py-2 rounded-lg font-bold cursor-not-allowed" disabled>
+                                                            Ver detalhes
+                                                        </button>
+                                                    )}
+                                                </div>
                                             </div>
-                                            <h3 className="text-xl font-semibold mt-2 text-cep-text dark:text-white">Edital {edital.number}</h3>
-                                            <div className="mt-4 text-sm text-slate-600 dark:text-slate-300 space-y-2 flex-grow">
-                                                <p><span className="font-semibold text-slate-800 dark:text-slate-100">Vagas:</span> {edital.vacancyDetails.reduce((sum, v) => sum + v.count, 0)}</p>
-                                                <p><span className="font-semibold text-slate-800 dark:text-slate-100">Inscrições:</span> {new Date(edital.inscriptionStart).toLocaleDateString('pt-BR')} a {new Date(edital.inscriptionEnd).toLocaleDateString('pt-BR')}</p>
-                                            </div>
-                                            <div className="mt-6">
-                                                {isOpen ? (
-                                                     <button onClick={() => navigate('/login')} className="w-full bg-cep-primary hover:bg-cep-secondary text-white py-2 rounded-lg font-bold transition-colors">
-                                                        Inscrever-se
-                                                     </button>
-                                                ) : (
-                                                    <button className="w-full bg-slate-200 text-slate-500 dark:bg-slate-700 dark:text-slate-400 py-2 rounded-lg font-bold cursor-not-allowed" disabled>
-                                                        Ver detalhes
-                                                    </button>
-                                                )}
-                                            </div>
-                                        </div>
-                                    )
-                                })}
-                            </div>
+                                        )
+                                    })}
+                                </div>
+                             ) : (
+                                <div className="text-center py-16 bg-slate-50 dark:bg-slate-800/80 rounded-lg border border-slate-200 dark:border-slate-700">
+                                    <IconFileText className="mx-auto h-12 w-12 text-gray-400 dark:text-gray-500"/>
+                                    <h3 className="mt-4 text-lg font-medium text-cep-text dark:text-white">Nenhum edital aberto no momento</h3>
+                                    <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">Por favor, volte mais tarde para verificar novas oportunidades.</p>
+                                </div>
+                            )
                         )}
                     </div>
                 </section>
@@ -236,6 +271,32 @@ const Home = () => {
                     <p>Desenvolvido para o Futuro da Educação.</p>
                 </div>
             </footer>
+            
+            <Modal
+                isOpen={isCallsModalOpen}
+                onClose={() => setIsCallsModalOpen(false)}
+                title="Chamadas Complementares Disponíveis"
+                size="lg"
+            >
+                <div className="space-y-3">
+                    {selectedEditalCalls.map(call => (
+                        <div key={call.id} className="p-3 bg-slate-50 dark:bg-slate-700/50 rounded-lg border border-slate-200 dark:border-slate-700 flex items-center justify-between">
+                            <div className="flex items-center min-w-0">
+                                <IconFileText className="h-5 w-5 mr-3 text-cep-primary flex-shrink-0"/>
+                                <span className="font-medium text-cep-text dark:text-slate-200 truncate" title={call.title}>
+                                    {call.title}
+                                </span>
+                            </div>
+                            <button 
+                                onClick={() => window.open(call.pdfUrl, '_blank')}
+                                className="bg-cep-secondary hover:bg-cep-primary text-white text-sm font-bold py-1 px-4 rounded-md transition-colors flex-shrink-0"
+                            >
+                                Abrir PDF
+                            </button>
+                        </div>
+                    ))}
+                </div>
+            </Modal>
         </div>
     );
 }

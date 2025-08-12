@@ -1,11 +1,24 @@
 
-import { User, UserRole, Application, ApplicationStatus, Edital, EditalModalities, Student, Document, AnalysisResult, EditalFormData, Appeal, ValidationStatus, VacancyType, VacancyShift } from '../types';
+
+import { User, UserRole, Application, ApplicationStatus, Edital, EditalModalities, Student, Document, AnalysisResult, EditalFormData, Appeal, ValidationStatus, VacancyType, VacancyShift, ComplementaryCall, EmailTemplate, CommissionAnalysis, AppealStatus, UserPermissions } from '../types';
 
 // --- MOCK DATABASE ---
 
 let users: User[] = [
-  { id: '1', name: 'Admin SEED', email: 'admin.seed@email.com', cpf: '11111111111', role: UserRole.ADMIN_SEED, phone: '41911111111' },
-  { id: '2', name: 'Admin CEP', email: 'admin.cep@email.com', cpf: '22222222222', role: UserRole.ADMIN_CEP, phone: '41922222222' },
+  { 
+    id: '1', name: 'Admin SEED', email: 'admin.seed@email.com', cpf: '11111111111', role: UserRole.ADMIN_SEED, phone: '41911111111',
+    permissions: { 
+      manage_editais: true, manage_chamadas: true, manage_analises: true, manage_casos_especiais: true, 
+      view_classificacao: true, manage_usuarios: true, view_relatorios: true, manage_email_templates: true, manage_config: true 
+    }
+  },
+  { 
+    id: '2', name: 'Admin CEP', email: 'admin.cep@email.com', cpf: '22222222222', role: UserRole.ADMIN_CEP, phone: '41922222222',
+    permissions: {
+      manage_editais: true, manage_chamadas: true, manage_analises: true, manage_casos_especiais: true,
+      view_classificacao: true, manage_usuarios: true, view_relatorios: true, manage_email_templates: true,
+    }
+  },
   { id: '3', name: 'Ana Lúcia (Analista)', email: 'analista@email.com', cpf: '33333333333', role: UserRole.ANALISTA, phone: '41933333333' },
   { id: '4', name: 'Carlos (Responsável)', email: 'responsavel@email.com', cpf: '44444444444', role: UserRole.RESPONSAVEL, phone: '41944444444' },
   { id: '5', name: 'Beatriz (Responsável)', email: 'responsavel2@email.com', cpf: '55555555555', role: UserRole.RESPONSAVEL, phone: '' },
@@ -16,6 +29,10 @@ let students: Student[] = [
     { id: 's2', name: 'Maria da Silva', cgm: '20240002', birthDate: '2013-11-22', responsibleCpf: '44444444444' },
     { id: 's3', name: 'Pedro Souza', cgm: '20240003', birthDate: '2010-02-15', responsibleCpf: '55555555555' },
     { id: 's4', name: 'Ana Pereira', cgm: '20240004', birthDate: '2008-08-20', responsibleCpf: '44444444444' },
+    { id: 's5', name: 'Lucas Martins', cgm: '20240005', birthDate: '2014-03-12', responsibleCpf: '44444444444' },
+    { id: 's6', name: 'Mariana Costa', cgm: '20240006', birthDate: '2014-07-01', responsibleCpf: '55555555555' },
+    { id: 's7', name: 'Tiago Ferreira', cgm: '20240007', birthDate: '2014-01-30', responsibleCpf: '55555555555' },
+    { id: 's8', name: 'Sofia Almeida', cgm: '20240008', birthDate: '2014-09-05', responsibleCpf: '44444444444' },
 ];
 
 const today = new Date();
@@ -41,20 +58,24 @@ let editais: Edital[] = [
       number: '005/2024', 
       modality: EditalModalities.FUNDAMENTAL_6_ANO, 
       vacancyDetails: [
-        { id: 'v1', count: 50, type: VacancyType.AMPLA_CONCORRENCIA, shift: VacancyShift.MANHA },
-        { id: 'v2', count: 5, type: VacancyType.EDUCACAO_ESPECIAL, shift: VacancyShift.MANHA }
+        { id: 'v1', count: 3, type: VacancyType.AMPLA_CONCORRENCIA, shift: VacancyShift.MANHA },
+        { id: 'v2', count: 1, type: VacancyType.EDUCACAO_ESPECIAL, shift: VacancyShift.MANHA }
       ], 
       year: new Date().getFullYear(), 
-      inscriptionStart: openStart.toISOString(), 
-      inscriptionEnd: openEnd.toISOString(), 
+      inscriptionStart: closedStart1.toISOString(),
+      inscriptionEnd: closedEnd1.toISOString(),
       analysisStart: '2025-11-26', 
       analysisEnd: '2025-12-01', 
       preliminaryResultDate: '2025-12-05',
       appealStartDate: '2025-12-06',
       appealEndDate: '2025-12-08',
       resultDate: '2025-12-10', 
-      vacancyAcceptanceDate: '2025-12-15',
-      customRequirements: []
+      vacancyAcceptanceDate: new Date(new Date().setDate(today.getDate() + 5)).toISOString(), // 5 days from now
+      customRequirements: [
+        { id: 'cr1', label: 'Candidato concluiu o 5º ano do Ensino Fundamental.' },
+        { id: 'cr2', label: 'Reside na região metropolitana de Curitiba.' },
+      ],
+      isActive: true,
     },
     { 
       id: 'e2', 
@@ -65,8 +86,8 @@ let editais: Edital[] = [
         { id: 'v4', count: 20, type: VacancyType.EDUCACAO_ESPECIAL, shift: VacancyShift.MANHA }
       ],
       year: new Date().getFullYear(), 
-      inscriptionStart: closedStart1.toISOString(), 
-      inscriptionEnd: closedEnd1.toISOString(), 
+      inscriptionStart: openStart.toISOString(),
+      inscriptionEnd: openEnd.toISOString(),
       analysisStart: '2025-11-26', 
       analysisEnd: '2025-12-01',
       preliminaryResultDate: '2025-12-05',
@@ -74,7 +95,8 @@ let editais: Edital[] = [
       appealEndDate: '2025-12-08',
       resultDate: '2025-12-10', 
       vacancyAcceptanceDate: '2025-12-15', 
-      customRequirements: [] 
+      customRequirements: [],
+      isActive: true,
     },
     { 
       id: 'e3', 
@@ -97,14 +119,20 @@ let editais: Edital[] = [
       customRequirements: [
         { id: 'cr2', label: 'Certificado de Conclusão do Ensino Médio' },
         { id: 'cr3', label: 'Carteira de Trabalho (página de identificação)' },
-      ]
+      ],
+      isActive: false, // Inactive example
     },
 ];
 
-const documents: Document[] = [
+let documents: Document[] = [
     { id: 'd1', fileName: 'boletim_joao.pdf', fileType: 'application/pdf', fileUrl: 'https://raw.githubusercontent.com/mozilla/pdf.js-sample-files/master/helloworld.pdf', validationStatus: ValidationStatus.PENDENTE },
     { id: 'd2', fileName: 'declaracao_matricula_joao.pdf', fileType: 'application/pdf', fileUrl: 'https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf', validationStatus: ValidationStatus.PENDENTE },
     { id: 'd3', fileName: 'laudo_maria.pdf', fileType: 'application/pdf', fileUrl: 'https://raw.githubusercontent.com/mozilla/pdf.js-sample-files/master/tracemonkey.pdf', validationStatus: ValidationStatus.PENDENTE },
+    // Docs for approved application
+    { id: 'd4', fileName: 'boletim_aprovado_ana.pdf', fileType: 'application/pdf', fileUrl: 'https://raw.githubusercontent.com/mozilla/pdf.js-sample-files/master/helloworld.pdf', validationStatus: ValidationStatus.VALIDO },
+    { id: 'd5', fileName: 'declaracao_aprovada_ana.pdf', fileType: 'application/pdf', fileUrl: 'https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf', validationStatus: ValidationStatus.VALIDO },
+    { id: 'd6', fileName: 'laudo_valido_mariana.pdf', fileType: 'application/pdf', fileUrl: 'https://raw.githubusercontent.com/mozilla/pdf.js-sample-files/master/helloworld.pdf', validationStatus: ValidationStatus.VALIDO },
+    { id: 'd7', fileName: 'laudo_invalido_sofia.pdf', fileType: 'application/pdf', fileUrl: 'https://raw.githubusercontent.com/mozilla/pdf.js-sample-files/master/tracemonkey.pdf', validationStatus: ValidationStatus.INVALIDO, invalidationReason: "Laudo médico vencido. É necessário um laudo emitido nos últimos 12 meses." },
 ]
 
 let applications: Application[] = [
@@ -149,9 +177,11 @@ let applications: Application[] = [
     finalScore: 85,
     submissionDate: '2025-10-27T09:00:00Z',
     appeal: {
+        protocol: `REC-20250003-${Date.now()}`,
         reason: 'Erro no cálculo de pontuação',
         justification: 'Acredito que a nota de matemática do 3º ano não foi computada corretamente.',
-        date: new Date().toISOString()
+        date: new Date().toISOString(),
+        status: AppealStatus.PENDENTE
     }
   },
    {
@@ -159,7 +189,7 @@ let applications: Application[] = [
     protocol: '20250004',
     student: students[3],
     edital: editais[1],
-    status: ApplicationStatus.CLASSIFICADO_FINAL,
+    status: ApplicationStatus.CLASSIFICADO_PRELIMINAR,
     documents: [documents[0]],
     specialNeeds: false,
     finalScore: 92,
@@ -175,9 +205,208 @@ let applications: Application[] = [
     specialNeeds: false,
     submissionDate: '2025-10-29T11:00:00Z',
   },
+  {
+    id: 'app6',
+    protocol: '20250006',
+    student: students[3], // Ana Pereira
+    edital: editais[0],
+    status: ApplicationStatus.ANALISE_CONCLUIDA,
+    documents: [documents[3], documents[4]],
+    specialNeeds: false,
+    finalScore: 95,
+    submissionDate: '2025-10-28T12:00:00Z',
+     analysis: {
+        analystId: '3',
+        analystName: 'Ana Lúcia (Analista)',
+        date: new Date().toISOString(),
+        justification: 'Documentação aprovada em conformidade com o edital.',
+        observation: '',
+        grades: [
+            { year: 1, subject: 'Português', score: 9.5 }, { year: 1, subject: 'Matemática', score: 9.5 },
+            { year: 2, subject: 'Português', score: 9.5 }, { year: 2, subject: 'Matemática', score: 9.5 },
+            { year: 3, subject: 'Português', score: 9.5 }, { year: 3, subject: 'Matemática', score: 9.5 },
+            { year: 4, subject: 'Português', score: 9.5 }, { year: 4, subject: 'Matemática', score: 9.5 },
+            { year: 5, subject: 'Português', score: 9.5 }, { year: 5, subject: 'Matemática', score: 9.5 },
+        ],
+        isApproved: true,
+        checklist: [
+            { requirementId: 'cr1', checked: true },
+            { requirementId: 'cr2', checked: true },
+        ]
+    }
+  },
+  // New applications for ranking and vacancy acceptance
+  {
+    id: 'app7',
+    protocol: '20250007',
+    student: students[4], // Lucas Martins
+    edital: editais[0],
+    status: ApplicationStatus.CLASSIFICADO_FINAL,
+    documents: [documents[3], documents[4]],
+    specialNeeds: false,
+    finalScore: 98,
+    submissionDate: '2025-10-28T13:00:00Z',
+  },
+  {
+    id: 'app8',
+    protocol: '20250008',
+    student: students[5], // Mariana Costa
+    edital: editais[0],
+    status: ApplicationStatus.AGUARDANDO_PARECER_COMISSAO,
+    documents: [documents[3], documents[4], documents[5]],
+    specialNeeds: true,
+    specialNeedsDocument: documents[5],
+    finalScore: 97,
+    submissionDate: '2025-10-28T14:00:00Z',
+    analysis: {
+        analystId: '3',
+        analystName: 'Ana Lúcia (Analista)',
+        date: new Date().toISOString(),
+        justification: 'Documentação formalmente correta. Laudo encaminhado para análise da comissão.',
+        observation: '',
+        grades: [
+             { year: 1, subject: 'Português', score: 9.8 }, { year: 1, subject: 'Matemática', score: 9.5 },
+            { year: 2, subject: 'Português', score: 9.6 }, { year: 2, subject: 'Matemática', score: 9.8 },
+            { year: 3, subject: 'Português', score: 9.7 }, { year: 3, subject: 'Matemática', score: 9.7 },
+            { year: 4, subject: 'Português', score: 9.9 }, { year: 4, subject: 'Matemática', score: 9.6 },
+            { year: 5, subject: 'Português', score: 9.8 }, { year: 5, subject: 'Matemática', score: 9.6 },
+        ],
+        isApproved: true,
+        checklist: [
+            { requirementId: 'cr1', checked: true },
+            { requirementId: 'cr2', checked: true },
+        ]
+    }
+  },
+  {
+    id: 'app9',
+    protocol: '20250009',
+    student: students[6], // Tiago Ferreira
+    edital: editais[0],
+    status: ApplicationStatus.ANALISE_CONCLUIDA,
+    documents: [documents[3], documents[4]],
+    specialNeeds: false,
+    finalScore: 88,
+    submissionDate: '2025-10-28T15:00:00Z',
+  },
+  {
+    id: 'app10',
+    protocol: '20250010',
+    student: students[7], // Sofia Almeida
+    edital: editais[0],
+    status: ApplicationStatus.ANALISE_CONCLUIDA,
+    documents: [documents[3], documents[4], documents[6]],
+    specialNeeds: true,
+    specialNeedsDocument: documents[6], // Invalid laudo
+    finalScore: 91,
+    submissionDate: '2025-10-28T16:00:00Z',
+  },
+];
+
+// New data for Complementary Calls
+const callStart = new Date();
+callStart.setDate(today.getDate() - 2);
+
+let complementaryCalls: ComplementaryCall[] = [
+    {
+        id: 'cc1',
+        editalId: 'e1', // Edital 005/2024 - 6º Ano EF
+        title: '2ª Chamada Complementar',
+        startDate: callStart.toISOString(),
+        pdfUrl: 'https://raw.githubusercontent.com/mozilla/pdf.js-sample-files/master/tracemonkey.pdf',
+        pdfFileName: 'chamada_complementar_edital_005_2024.pdf'
+    },
+    {
+        id: 'cc2',
+        editalId: 'e1', // Same edital
+        title: '3ª Chamada Complementar - Vagas Remanescentes',
+        startDate: callStart.toISOString(),
+        pdfUrl: 'https://raw.githubusercontent.com/mozilla/pdf.js-sample-files/master/helloworld.pdf',
+        pdfFileName: 'chamada_complementar_3_edital_005_2024.pdf'
+    }
+];
+
+let emailTemplates: EmailTemplate[] = [
+    {
+        id: 'tmpl_1',
+        name: 'Confirmação de Inscrição',
+        subject: 'Confirmação de Inscrição - Sistema Acesso CEP',
+        body: `Olá {{studentName}},
+
+Sua inscrição foi recebida com sucesso.
+
+Detalhes:
+- Protocolo: {{protocol}}
+- Edital: {{edital}}
+- Data de Envio: {{submissionDate}}
+
+Acompanhe o status no portal.
+
+Atenciosamente,
+Equipe do Colégio Estadual do Paraná (CEP)`,
+    },
+    {
+        id: 'tmpl_2',
+        name: 'Documentação Incompleta',
+        subject: 'Ação Necessária: Documentação Incompleta na sua Inscrição',
+        body: `Olá {{studentName}},
+
+A análise da sua inscrição (protocolo {{protocol}}) encontrou pendências.
+
+Por favor, acesse o portal para visualizar as observações do analista e enviar os documentos corrigidos.
+
+Justificativa do analista:
+{{justification}}
+
+Atenciosamente,
+Equipe do Colégio Estadual do Paraná (CEP)`,
+    },
 ];
 
 const simulateDelay = (ms: number) => new Promise(res => setTimeout(res, ms));
+
+const renderEmailHtml = (plainText: string): string => {
+    const bodyWithBreaks = plainText
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/\n/g, '<br />');
+
+    return `
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol'; line-height: 1.6; color: #333; margin: 0; padding: 0; background-color: #f4f4f4; }
+        .wrapper { width: 100%; padding: 20px 0; }
+        .container { width: 100%; max-width: 600px; margin: 0 auto; background-color: #ffffff; padding: 30px; border-radius: 8px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); border: 1px solid #ddd; }
+        .header { text-align: center; border-bottom: 1px solid #eee; padding-bottom: 20px; margin-bottom: 20px; }
+        .header h1 { color: #0D2635; margin: 0; font-size: 24px; }
+        .content { font-size: 16px; white-space: pre-wrap; }
+        .footer { text-align: center; margin-top: 30px; padding-top: 20px; border-top: 1px solid #eee; font-size: 12px; color: #888; }
+    </style>
+</head>
+<body>
+    <div class="wrapper">
+        <div class="container">
+            <div class="header">
+                <h1>Colégio Estadual do Paraná</h1>
+            </div>
+            <div class="content">
+                ${bodyWithBreaks}
+            </div>
+            <div class="footer">
+                <p>Este é um e-mail automático. Por favor, não responda.</p>
+                <p>&copy; ${new Date().getFullYear()} Sistema Acesso CEP</p>
+            </div>
+        </div>
+    </div>
+</body>
+</html>`;
+};
+
 
 // --- API FUNCTIONS ---
 
@@ -200,12 +429,19 @@ export const api = {
 
   getApplicationsForAnalyst: async (): Promise<Application[]> => {
     await simulateDelay(800);
-    return applications.filter(app => [ApplicationStatus.EM_ANALISE, ApplicationStatus.DOCUMENTACAO_INCOMPLETA, ApplicationStatus.EM_RECURSO].includes(app.status));
+    return applications.filter(app => [ApplicationStatus.EM_ANALISE, ApplicationStatus.DOCUMENTACAO_INCOMPLETA, ApplicationStatus.ANALISE_CONCLUIDA, ApplicationStatus.EM_RECURSO, ApplicationStatus.AGUARDANDO_PARECER_COMISSAO].includes(app.status));
   },
 
   getApplicationById: async (id: string): Promise<Application | undefined> => {
     await simulateDelay(300);
-    return applications.find(app => app.id === id);
+    const app = applications.find(app => app.id === id);
+    if (app) {
+        // Ensure specialNeedsDocument is also in the documents array for consistency
+        if (app.specialNeedsDocument && !app.documents.find(d => d.id === app.specialNeedsDocument!.id)) {
+            return { ...app, documents: [...app.documents, app.specialNeedsDocument] };
+        }
+    }
+    return app;
   },
   
   getAllApplications: async (): Promise<Application[]> => {
@@ -233,8 +469,16 @@ export const api = {
         analysis,
         documents: updatedDocs,
         status: newStatus,
-        finalScore: newStatus === ApplicationStatus.ANALISE_CONCLUIDA ? totalScore : applications[appIndex].finalScore,
+        finalScore: (newStatus === ApplicationStatus.ANALISE_CONCLUIDA || newStatus === ApplicationStatus.AGUARDANDO_PARECER_COMISSAO) ? totalScore : applications[appIndex].finalScore,
     };
+    
+    // Also update the specialNeedsDocument if it exists to reflect validation changes
+    if (applications[appIndex].specialNeedsDocument) {
+        const updatedLaudo = updatedDocs.find(d => d.id === applications[appIndex].specialNeedsDocument!.id);
+        if (updatedLaudo) {
+            applications[appIndex].specialNeedsDocument = updatedLaudo;
+        }
+    }
 
     return applications[appIndex];
   },
@@ -249,12 +493,13 @@ export const api = {
     const newEdital: Edital = {
         id: `e${Date.now()}`,
         ...editalData,
+        isActive: true, // New editais are active by default
     };
     editais.push(newEdital);
     return newEdital;
   },
 
-  updateEdital: async(editalId: string, editalData: EditalFormData): Promise<Edital> => {
+  updateEdital: async(editalId: string, editalData: Partial<EditalFormData>): Promise<Edital> => {
     await simulateDelay(600);
     const editalIndex = editais.findIndex(e => e.id === editalId);
     if (editalIndex === -1) throw new Error("Edital não encontrado.");
@@ -267,6 +512,30 @@ export const api = {
     const editalIndex = editais.findIndex(e => e.id === editalId);
     if (editalIndex === -1) throw new Error("Edital não encontrado.");
     editais.splice(editalIndex, 1);
+    // Cascade delete associated complementary calls
+    complementaryCalls = complementaryCalls.filter(c => c.editalId !== editalId);
+  },
+
+  getComplementaryCalls: async (): Promise<ComplementaryCall[]> => {
+    await simulateDelay(300);
+    return [...complementaryCalls];
+  },
+
+  createComplementaryCall: async (data: Omit<ComplementaryCall, 'id'>): Promise<ComplementaryCall> => {
+    await simulateDelay(600);
+    const newCall: ComplementaryCall = {
+        id: `cc${Date.now()}`,
+        ...data,
+    };
+    complementaryCalls.push(newCall);
+    return newCall;
+  },
+  
+  deleteComplementaryCall: async (callId: string): Promise<void> => {
+    await simulateDelay(600);
+    const callIndex = complementaryCalls.findIndex(c => c.id === callId);
+    if (callIndex === -1) throw new Error("Chamada complementar não encontrada.");
+    complementaryCalls.splice(callIndex, 1);
   },
 
   getStudentsByResponsible: async(cpf: string): Promise<Student[]> => {
@@ -280,13 +549,15 @@ export const api = {
     return student;
   },
 
-  createStudent: async (name: string, birthDate: string, responsibleCpf: string): Promise<Student> => {
+  createStudent: async (name: string, birthDate: string, responsibleCpf: string, rg?: string, uf?: string): Promise<Student> => {
     await simulateDelay(700);
     const newStudent: Student = {
         id: `s${Date.now()}`,
         name,
         birthDate,
         responsibleCpf,
+        rg,
+        uf,
         // No CGM for private school students
     };
     students.push(newStudent);
@@ -319,11 +590,26 @@ export const api = {
     return [...users];
   },
 
+  createUser: async (userData: Omit<User, 'id'>): Promise<User> => {
+    await simulateDelay(600);
+    if (users.some(u => u.cpf === userData.cpf)) {
+      throw new Error("Já existe um usuário com este CPF.");
+    }
+    const newUser: User = {
+      id: `u${Date.now()}`,
+      ...userData,
+    };
+    users.push(newUser);
+    return newUser;
+  },
+
   updateUser: async(userId: string, userData: Partial<User>): Promise<User> => {
     await simulateDelay(500);
     const userIndex = users.findIndex(u => u.id === userId);
     if(userIndex === -1) throw new Error("Usuário não encontrado.");
-    users[userIndex] = { ...users[userIndex], ...userData };
+    const existingPermissions = users[userIndex].permissions || {};
+    const updatedPermissions = { ...existingPermissions, ...userData.permissions };
+    users[userIndex] = { ...users[userIndex], ...userData, permissions: updatedPermissions };
     return users[userIndex];
   },
   
@@ -335,23 +621,63 @@ export const api = {
     users.splice(userIndex, 1);
   },
   
-  submitAppeal: async (appId: string, reason: string, justification: string): Promise<Application> => {
+  submitAppeal: async (appId: string, reason: string, justification: string, attachmentFile?: File): Promise<Application> => {
     await simulateDelay(800);
     const appIndex = applications.findIndex(a => a.id === appId);
     if(appIndex === -1) throw new Error("Aplicação não encontrada");
+    const app = applications[appIndex];
+
+    let attachment: Document | undefined = undefined;
+    if (attachmentFile) {
+        const newDocId = `d-appeal-${Date.now()}`;
+        attachment = {
+            id: newDocId,
+            fileName: attachmentFile.name,
+            fileType: attachmentFile.type,
+            fileUrl: URL.createObjectURL(attachmentFile), // MOCK
+            validationStatus: ValidationStatus.VALIDO,
+        };
+        documents.push(attachment);
+    }
 
     const appeal: Appeal = {
+        protocol: `REC-${app.protocol}-${Date.now()}`,
         reason,
         justification,
-        date: new Date().toISOString()
+        date: new Date().toISOString(),
+        status: AppealStatus.PENDENTE,
+        attachment,
     };
     
     applications[appIndex] = {
-        ...applications[appIndex],
+        ...app,
         appeal,
         status: ApplicationStatus.EM_RECURSO,
     };
     return applications[appIndex];
+  },
+
+  resolveAppeal: async (appId: string, decision: { status: AppealStatus.DEFERIDO | AppealStatus.INDEFERIDO, analystJustification: string }): Promise<Application> => {
+    await simulateDelay(800);
+    const appIndex = applications.findIndex(a => a.id === appId);
+    if(appIndex === -1) throw new Error("Aplicação não encontrada");
+    const app = applications[appIndex];
+    if (!app.appeal) throw new Error("Aplicação não possui um recurso para ser resolvido.");
+
+    const updatedAppeal: Appeal = {
+        ...app.appeal,
+        status: decision.status,
+        analystJustification: decision.analystJustification,
+    };
+
+    app.appeal = updatedAppeal;
+
+    if (decision.status === AppealStatus.INDEFERIDO) {
+        app.status = ApplicationStatus.CLASSIFICADO_PRELIMINAR; 
+    }
+    
+    applications[appIndex] = app;
+    return app;
   },
 
   acceptVacancy: async (appId: string): Promise<Application> => {
@@ -365,4 +691,115 @@ export const api = {
     };
     return applications[appIndex];
   },
+
+  declineVacancy: async (appId: string): Promise<Application> => {
+    await simulateDelay(500);
+    const appIndex = applications.findIndex(a => a.id === appId);
+    if(appIndex === -1) throw new Error("Aplicação não encontrada");
+    
+    applications[appIndex] = {
+        ...applications[appIndex],
+        status: ApplicationStatus.VAGA_RECUSADA,
+    };
+    return applications[appIndex];
+  },
+  
+  getEmailTemplates: async (): Promise<EmailTemplate[]> => {
+    await simulateDelay(300);
+    return [...emailTemplates];
+  },
+
+  updateEmailTemplate: async (templateId: string, data: Partial<Omit<EmailTemplate, 'id' | 'name'>>): Promise<EmailTemplate> => {
+    await simulateDelay(500);
+    const templateIndex = emailTemplates.findIndex(t => t.id === templateId);
+    if (templateIndex === -1) throw new Error('Template não encontrado');
+    emailTemplates[templateIndex] = { ...emailTemplates[templateIndex], ...data };
+    return emailTemplates[templateIndex];
+  },
+
+  sendEmail: async (templateName: string, context: Record<string, string>): Promise<void> => {
+    await simulateDelay(200);
+    const template = emailTemplates.find(t => t.name === templateName);
+    if (!template) {
+        console.error(`Email template "${templateName}" not found.`);
+        return;
+    }
+
+    let processedBody = template.body;
+    for (const key in context) {
+        if (key !== 'recipientEmail') {
+             processedBody = processedBody.replace(new RegExp(`{{${key}}}`, 'g'), context[key]);
+        }
+    }
+    
+    const mainRecipient = context.recipientEmail;
+    let bccRecipient: string | null = null;
+    
+    if (templateName === 'Confirmação de Inscrição') {
+        bccRecipient = 'michel.delespinasse@escola.pr.gov.br';
+    }
+
+    console.log('--- SENDING MOCK EMAIL ---');
+    console.log('Template:', template.name);
+    
+    if (mainRecipient) {
+        console.log(`To: ${mainRecipient}`);
+    } else {
+        console.warn('Warning: No main recipient (To:) specified for this email.');
+    }
+    
+    if (bccRecipient) {
+        console.log(`BCC: ${bccRecipient}`);
+    }
+    
+    console.log(`Subject: ${template.subject}`);
+    // To see the HTML, you can uncomment the log below
+    // const finalHtml = renderEmailHtml(processedBody);
+    // console.log(finalHtml);
+    console.log('--- EMAIL SENT (to all specified recipients) ---');
+  },
+  
+  getSpecialEducationApplications: async (): Promise<Application[]> => {
+    await simulateDelay(800);
+    return applications.filter(app => app.status === ApplicationStatus.AGUARDANDO_PARECER_COMISSAO);
+  },
+
+  submitCommissionDecision: async (appId: string, decision: { isEligible: boolean; justification: string; commissionMemberId: string; commissionMemberName: string; }): Promise<Application> => {
+      await simulateDelay(1000);
+      const appIndex = applications.findIndex(a => a.id === appId);
+      if (appIndex === -1) throw new Error("Aplicação não encontrada");
+
+      const commissionAnalysis: CommissionAnalysis = {
+          ...decision,
+          date: new Date().toISOString()
+      };
+      
+      applications[appIndex].commissionAnalysis = commissionAnalysis;
+      applications[appIndex].status = ApplicationStatus.ANALISE_CONCLUIDA;
+
+      if (!decision.isEligible && applications[appIndex].specialNeedsDocument) {
+          const docId = applications[appIndex].specialNeedsDocument!.id;
+          const reason = `Indeferido pela comissão: ${decision.justification}`;
+          
+          // Update the main documents array
+          const docIndex = documents.findIndex(d => d.id === docId);
+          if (docIndex !== -1) {
+              documents[docIndex].validationStatus = ValidationStatus.INVALIDO;
+              documents[docIndex].invalidationReason = reason;
+          }
+          
+          // Update the document within the application object
+          const appDocIndex = applications[appIndex].documents.findIndex(d => d.id === docId);
+          if(appDocIndex !== -1) {
+              applications[appIndex].documents[appDocIndex].validationStatus = ValidationStatus.INVALIDO;
+              applications[appIndex].documents[appDocIndex].invalidationReason = reason;
+          }
+          
+          applications[appIndex].specialNeedsDocument!.validationStatus = ValidationStatus.INVALIDO;
+          applications[appIndex].specialNeedsDocument!.invalidationReason = reason;
+      }
+
+      return applications[appIndex];
+  },
+
 };

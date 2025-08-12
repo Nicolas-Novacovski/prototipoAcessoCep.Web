@@ -1,4 +1,5 @@
 
+
 import React from 'react';
 import { ApplicationStatus } from '../../types';
 import { IconFileCheck } from '../../constants';
@@ -45,8 +46,10 @@ const Stepper = ({ currentStatus }: { currentStatus: ApplicationStatus }) => {
   if (isOffTrack) {
     if (currentStatus === ApplicationStatus.DOCUMENTACAO_INCOMPLETA) offTrackMessage = 'Aguardando correção da documentação pelo responsável.';
     else if (currentStatus === ApplicationStatus.EM_RECURSO) offTrackMessage = 'Processo em fase de recurso administrativo.';
+    else if (currentStatus === ApplicationStatus.AGUARDANDO_PARECER_COMISSAO) offTrackMessage = 'Laudo médico em análise pela comissão técnica especializada.';
     else if (currentStatus === ApplicationStatus.NAO_CLASSIFICADO) offTrackMessage = 'Candidato não classificado neste edital.';
     else if (currentStatus === ApplicationStatus.ANALISE_INDEFERIDA) offTrackMessage = 'Análise indeferida pela equipe do CEP. O responsável foi notificado com a justificativa.';
+    else if (currentStatus === ApplicationStatus.VAGA_RECUSADA) offTrackMessage = 'A vaga foi recusada pelo responsável. O processo está encerrado.';
   }
 
   return (

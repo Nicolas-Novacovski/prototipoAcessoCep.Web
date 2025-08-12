@@ -1,4 +1,5 @@
 
+
 export enum UserRole {
   ADMIN_SEED = 'Admin (SEED)',
   ADMIN_CEP = 'Administrativo (CEP)',
@@ -11,11 +12,13 @@ export enum ApplicationStatus {
   EM_ANALISE = 'Em Análise',
   DOCUMENTACAO_INCOMPLETA = 'Documentação Incompleta',
   ANALISE_CONCLUIDA = 'Análise Concluída',
+  AGUARDANDO_PARECER_COMISSAO = 'Aguardando Parecer da Comissão',
   ANALISE_INDEFERIDA = 'Análise Indeferida',
   EM_RECURSO = 'Em Recurso',
   CLASSIFICADO_PRELIMINAR = 'Classificado (Preliminar)',
   CLASSIFICADO_FINAL = 'Classificado (Final)',
   VAGA_ACEITA = 'Vaga Aceita',
+  VAGA_RECUSADA = 'Vaga Recusada',
   NAO_CLASSIFICADO = 'Não Classificado',
 }
 
@@ -45,6 +48,27 @@ export enum VacancyShift {
     INTEGRAL = 'Integral',
 }
 
+export enum AppealStatus {
+    PENDENTE = 'Pendente',
+    DEFERIDO = 'Deferido',
+    INDEFERIDO = 'Indeferido',
+}
+
+export type PermissionKey =
+  | 'manage_editais'
+  | 'manage_chamadas'
+  | 'manage_analises'
+  | 'manage_casos_especiais'
+  | 'view_classificacao'
+  | 'manage_usuarios'
+  | 'view_relatorios'
+  | 'manage_email_templates'
+  | 'manage_config';
+
+export type UserPermissions = {
+  [key in PermissionKey]?: boolean;
+};
+
 export interface User {
   id: string;
   name: string;
@@ -52,6 +76,7 @@ export interface User {
   cpf: string;
   role: UserRole;
   phone?: string;
+  permissions?: UserPermissions;
 }
 
 export interface Student {
@@ -60,6 +85,8 @@ export interface Student {
     cgm?: string;
     birthDate: string;
     responsibleCpf: string;
+    rg?: string;
+    uf?: string;
 }
 
 export interface Document {
@@ -99,6 +126,7 @@ export interface Edital {
     resultDate: string;
     vacancyAcceptanceDate: string;
     customRequirements?: CustomRequirement[];
+    isActive: boolean;
 }
 
 export type EditalFormData = Omit<Edital, 'id'>;
@@ -113,18 +141,39 @@ export interface Grade {
 export interface AnalysisResult {
     analystId: string;
     analystName: string;
-
     date: string;
     justification: string;
     observation: string;
     grades: Grade[];
     isApproved: boolean;
+    checklist?: { requirementId: string; checked: boolean; }[];
 }
 
 export interface Appeal {
+    protocol: string;
     reason: string;
     justification: string;
     date: string;
+    status: AppealStatus;
+    analystJustification?: string;
+    attachment?: Document;
+}
+
+export interface CommissionAnalysis {
+  commissionMemberId: string;
+  commissionMemberName: string;
+  date: string;
+  isEligible: boolean;
+  justification: string;
+}
+
+export interface ComplementaryCall {
+  id: string;
+  editalId: string;
+  title: string;
+  startDate: string;
+  pdfUrl: string;
+  pdfFileName: string;
 }
 
 export interface Address {
@@ -147,8 +196,19 @@ export interface Application {
     specialNeedsDocument?: Document;
     finalScore?: number;
     analysis?: AnalysisResult;
+    commissionAnalysis?: CommissionAnalysis;
     submissionDate: string;
     siblingCgm?: string;
     appeal?: Appeal;
     address?: Address;
+    responsibleName?: string;
+    responsibleEmail?: string;
+    responsiblePhone?: string;
+}
+
+export interface EmailTemplate {
+  id: string;
+  name: string;
+  subject: string;
+  body: string; // HTML content
 }

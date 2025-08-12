@@ -1,6 +1,9 @@
 
+
+
+
 import React, { useState, useEffect } from 'react';
-import { User, UserRole } from '../../types';
+import { User, UserRole, PermissionKey, UserPermissions } from '../../types';
 import { api } from '../../services/mockApi';
 import Card, { CardContent } from '../../components/ui/Card';
 import Button from '../../components/ui/Button';
@@ -11,6 +14,26 @@ import Select from '../../components/ui/Select';
 import { IconEdit, IconTrash } from '../../constants';
 import { useToast } from '../../hooks/useToast';
 import ConfirmationModal from '../../components/ui/ConfirmationModal';
+import { useAuth } from '../../hooks/useAuth';
+
+const allPermissions: { key: PermissionKey; label: string; }[] = [
+    { key: 'manage_editais', label: 'Gerenciar Editais' },
+    { key: 'manage_chamadas', label: 'Gerenciar Chamadas Complementares' },
+    { key: 'manage_analises', label: 'Acompanhar Todas Análises' },
+    { key: 'manage_casos_especiais', label: 'Analisar Casos Especiais (Comissão)' },
+    { key: 'view_classificacao', label: 'Visualizar Classificação' },
+    { key: 'manage_usuarios', label: 'Gerenciar Usuários' },
+    { key: 'view_relatorios', label: 'Gerar Relatórios' },
+    { key: 'manage_email_templates', label: 'Gerenciar Templates de E-mail' },
+    { key: 'manage_config', label: 'Configurações Globais (SEED)' },
+];
+
+const cepDelegablePermissions: PermissionKey[] = [
+    'manage_editais', 'manage_chamadas', 'manage_analises',
+    'manage_casos_especiais', 'view_classificacao', 'manage_usuarios',
+    'view_relatorios', 'manage_email_templates'
+];
+
 
 const ManageUsers = () => {
   const [users, setUsers] = useState<User[]>([]);
@@ -29,6 +52,11 @@ const ManageUsers = () => {
   useEffect(() => {
     fetchUsers();
   }, []);
+
+  const openModalForNew = () => {
+    setEditingUser(null);
+    setIsModalOpen(true);
+  };
 
   const openModalForEdit = (user: User) => {
     setEditingUser(user);
@@ -50,11 +78,15 @@ const ManageUsers = () => {
     setIsConfirmOpen(false);
   };
 
-  const handleSave = async (userData: Partial<User>) => {
-    if (!editingUser) return;
+  const handleSave = async (userData: Partial<User>, isNew: boolean) => {
     try {
-      await api.updateUser(editingUser.id, userData);
-      addToast('Usuário atualizado com sucesso!', 'success');
+      if (isNew) {
+        await api.createUser(userData as Omit<User, 'id'>);
+        addToast('Usuário criado com sucesso!', 'success');
+      } else if (editingUser) {
+        await api.updateUser(editingUser.id, userData);
+        addToast('Usuário atualizado com sucesso!', 'success');
+      }
       fetchUsers();
     } catch (err) {
       addToast(err instanceof Error ? err.message : 'Erro ao salvar usuário', 'error');
@@ -81,7 +113,7 @@ const ManageUsers = () => {
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <h1 className="text-3xl font-bold text-cep-text dark:text-white">Gerenciar Usuários</h1>
-        {/* <Button>Novo Usuário</Button> */}
+        <Button onClick={openModalForNew}>Novo Usuário</Button>
       </div>
       <Card>
         <CardContent>
@@ -102,6 +134,7 @@ const ManageUsers = () => {
         onConfirm={handleDelete}
         title="Confirmar Exclusão"
         message="Tem certeza que deseja excluir este usuário? Esta ação não pode ser desfeita."
+        confirmButtonText="Confirmar Exclusão"
       />
     </div>
   );
@@ -145,8 +178,18 @@ const UserTable = ({ users, onEdit, onDelete }: { users: User[]; onEdit: (user: 
   );
 };
 
-const UserFormModal = ({ isOpen, onClose, onSave, user }: { isOpen: boolean; onClose: () => void; onSave: (data: Partial<User>) => void; user: User | null; }) => {
-  const [formData, setFormData] = useState<Partial<User>>({ name: '', email: '', role: UserRole.ANALISTA, ...user });
+const UserFormModal = ({ isOpen, onClose, onSave, user }: { isOpen: boolean; onClose: () => void; onSave: (data: Partial<User>, isNew: boolean) => void; user: User | null; }) => {
+  const isNewUser = !user;
+  const { user: currentUser } = useAuth();
+  
+  const [formData, setFormData] = useState<Partial<User>>({
+    name: '',
+    email: '',
+    cpf: '',
+    role: UserRole.ANALISTA,
+    permissions: {},
+    ...user,
+  });
   const [isSaving, setIsSaving] = useState(false);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
@@ -154,24 +197,68 @@ const UserFormModal = ({ isOpen, onClose, onSave, user }: { isOpen: boolean; onC
     setFormData(prev => ({ ...prev, [name]: value }));
   };
 
+  const handlePermissionChange = (key: PermissionKey, checked: boolean) => {
+    setFormData(prev => ({
+      ...prev,
+      permissions: {
+        ...prev.permissions,
+        [key]: checked,
+      }
+    }));
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSaving(true);
-    await onSave(formData);
+    await onSave(formData, isNewUser);
     setIsSaving(false);
   };
 
-  const allowedRoles = [UserRole.ANALISTA, UserRole.ADMIN_CEP, UserRole.ADMIN_SEED, UserRole.RESPONSAVEL];
+  const allPossibleRoles = [UserRole.ANALISTA, UserRole.ADMIN_CEP, UserRole.RESPONSAVEL, UserRole.ADMIN_SEED];
+  const allowedRoles = currentUser?.role === UserRole.ADMIN_SEED
+    ? allPossibleRoles
+    : allPossibleRoles.filter(role => role !== UserRole.ADMIN_SEED);
+
+  const availablePermissions = currentUser?.role === UserRole.ADMIN_SEED
+    ? allPermissions
+    : allPermissions.filter(p => cepDelegablePermissions.includes(p.key));
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title={user ? 'Editar Usuário' : 'Novo Usuário'}>
+    <Modal isOpen={isOpen} onClose={onClose} title={isNewUser ? 'Novo Usuário' : 'Editar Usuário'}>
       <form onSubmit={handleSubmit} className="space-y-4">
-        <Input id="name" name="name" label="Nome" value={formData.name} onChange={handleChange} required />
+        <Input id="name" name="name" label="Nome Completo" value={formData.name} onChange={handleChange} required />
         <Input id="email" name="email" label="Email" type="email" value={formData.email} onChange={handleChange} required />
-        <Input id="cpf" name="cpf" label="CPF" value={formData.cpf} disabled />
+        <Input id="cpf" name="cpf" label="CPF (somente números)" value={formData.cpf} onChange={(e) => setFormData(prev => ({...prev, cpf: e.target.value.replace(/\D/g, '')}))} maxLength={11} disabled={!isNewUser} required />
         <Select id="role" name="role" label="Perfil" value={formData.role} onChange={handleChange}>
           {allowedRoles.map(r => <option key={r} value={r}>{r}</option>)}
         </Select>
+        
+        {(formData.role === UserRole.ADMIN_CEP || formData.role === UserRole.ADMIN_SEED) && (
+            <div className="space-y-2 pt-4 border-t dark:border-slate-700">
+                <h3 className="text-lg font-medium text-cep-text dark:text-white">Permissões Específicas</h3>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-2">
+                    {availablePermissions.map(perm => (
+                        <div key={perm.key} className="relative flex items-start">
+                            <div className="flex h-5 items-center">
+                                <input
+                                    id={`perm-${perm.key}`}
+                                    type="checkbox"
+                                    className="h-4 w-4 rounded border-gray-300 dark:border-slate-600 text-cep-primary focus:ring-cep-primary"
+                                    checked={formData.permissions?.[perm.key] || false}
+                                    onChange={(e) => handlePermissionChange(perm.key, e.target.checked)}
+                                />
+                            </div>
+                            <div className="ml-3 text-sm">
+                                <label htmlFor={`perm-${perm.key}`} className="font-medium text-cep-text dark:text-slate-200">
+                                    {perm.label}
+                                </label>
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            </div>
+        )}
+
         <div className="flex justify-end gap-2 pt-4 border-t dark:border-slate-700">
           <Button type="button" variant="secondary" onClick={onClose}>Cancelar</Button>
           <Button type="submit" isLoading={isSaving}>Salvar</Button>

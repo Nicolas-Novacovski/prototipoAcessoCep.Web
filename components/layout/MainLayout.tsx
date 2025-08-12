@@ -1,48 +1,72 @@
 
+
+
+
+
+
 import React, { ReactNode } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
-import { UserRole } from '../../types';
-import { APP_TITLE, IconLayoutDashboard, IconFileText, IconUserCheck, IconSettings, IconUsers, IconBarChart, IconLogOut } from '../../constants';
+import { UserRole, PermissionKey } from '../../types';
+import { APP_TITLE, IconLayoutDashboard, IconFileText, IconUserCheck, IconSettings, IconUsers, IconBarChart, IconLogOut, IconPlusCircle, IconTrendingUp, IconMail, IconShieldCheck } from '../../constants';
+
+const adminNavLinksConfig: { key: PermissionKey; to: string; icon: React.ReactNode; label: string; }[] = [
+    { key: 'manage_editais', to: '/admin/editais', icon: <IconFileText className="h-5 w-5" />, label: 'Gerenciar Editais' },
+    { key: 'manage_chamadas', to: '/admin/chamadas', icon: <IconPlusCircle className="h-5 w-5" />, label: 'Chamadas Comp.' },
+    { key: 'manage_analises', to: '/admin/analises', icon: <IconUserCheck className="h-5 w-5" />, label: 'Acompanhar Análises' },
+    { key: 'manage_casos_especiais', to: '/admin/casos-especiais', icon: <IconShieldCheck className="h-5 w-5" />, label: 'Análise Especial' },
+    { key: 'view_classificacao', to: '/classificacao', icon: <IconTrendingUp className="h-5 w-5" />, label: 'Classificação' },
+    { key: 'manage_usuarios', to: '/admin/usuarios', icon: <IconUsers className="h-5 w-5" />, label: 'Gerenciar Usuários' },
+    { key: 'view_relatorios', to: '/admin/relatorios', icon: <IconBarChart className="h-5 w-5" />, label: 'Relatórios' },
+    { key: 'manage_email_templates', to: '/admin/email-templates', icon: <IconMail className="h-5 w-5" />, label: 'Templates de E-mail' },
+    { key: 'manage_config', to: '/admin/config', icon: <IconSettings className="h-5 w-5" />, label: 'Configurações' },
+];
 
 const Sidebar = () => {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
 
   const handleLogout = () => {
-    // Navigate home first to allow the route change to process.
-    // Then, clear the auth state in a timeout. This prevents the
-    // ProtectedRoute from re-rendering on the old page and
-    // redirecting to /login before the navigation to '/' completes.
     navigate('/');
     setTimeout(() => {
       logout();
     }, 50);
   };
 
-  const navLinks = {
-    [UserRole.RESPONSAVEL]: [
-      { to: '/dashboard', icon: <IconLayoutDashboard className="h-5 w-5" />, label: 'Minhas Inscrições' },
-    ],
-    [UserRole.ANALISTA]: [
-      { to: '/dashboard', icon: <IconLayoutDashboard className="h-5 w-5" />, label: 'Painel de Análise' },
-    ],
-    [UserRole.ADMIN_CEP]: [
-      { to: '/dashboard', icon: <IconLayoutDashboard className="h-5 w-5" />, label: 'Painel Geral' },
-      { to: '/admin/editais', icon: <IconFileText className="h-5 w-5" />, label: 'Gerenciar Editais' },
-      { to: '/admin/analises', icon: <IconUserCheck className="h-5 w-5" />, label: 'Acompanhar Análises' },
-      { to: '/admin/usuarios', icon: <IconUsers className="h-5 w-5" />, label: 'Gerenciar Usuários' },
-      { to: '/admin/relatorios', icon: <IconBarChart className="h-5 w-5" />, label: 'Relatórios' },
-    ],
-     [UserRole.ADMIN_SEED]: [
-      { to: '/dashboard', icon: <IconLayoutDashboard className="h-5 w-5" />, label: 'Painel Geral' },
-      { to: '/admin/editais', icon: <IconFileText className="h-5 w-5" />, label: 'Gerenciar Editais' },
-      { to: '/admin/usuarios', icon: <IconUsers className="h-5 w-5" />, label: 'Gerenciar Usuários' },
-      { to: '/admin/config', icon: <IconSettings className="h-5 w-5" />, label: 'Configurações' },
-    ],
+  const getNavLinks = () => {
+    if (!user) return [];
+
+    switch(user.role) {
+      case UserRole.RESPONSAVEL:
+        return [
+          { to: '/dashboard', icon: <IconLayoutDashboard className="h-5 w-5" />, label: 'Minhas Inscrições' },
+        ];
+      case UserRole.ANALISTA:
+        return [
+          { to: '/dashboard', icon: <IconLayoutDashboard className="h-5 w-5" />, label: 'Painel de Análise' },
+          { to: '/classificacao', icon: <IconTrendingUp className="h-5 w-5" />, label: 'Classificação' },
+        ];
+      case UserRole.ADMIN_CEP:
+      case UserRole.ADMIN_SEED:
+        const adminLinks: { to: string; icon: React.ReactNode; label: string; }[] = [
+          { to: '/dashboard', icon: <IconLayoutDashboard className="h-5 w-5" />, label: 'Painel Geral' },
+        ];
+        
+        if (user.permissions) {
+            adminNavLinksConfig.forEach(linkConfig => {
+                if (user.permissions![linkConfig.key]) {
+                    const { key, ...navLink } = linkConfig;
+                    adminLinks.push(navLink);
+                }
+            });
+        }
+        return adminLinks;
+      default:
+        return [];
+    }
   };
 
-  const links = user ? navLinks[user.role] : [];
+  const links = getNavLinks();
 
   return (
     <aside className="w-64 h-full flex-shrink-0 bg-white dark:bg-slate-800 border-r border-slate-200 dark:border-slate-700 text-cep-text dark:text-slate-300 flex flex-col">

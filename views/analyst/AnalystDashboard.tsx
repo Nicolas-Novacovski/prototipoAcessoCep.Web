@@ -32,6 +32,7 @@ const AnalystDashboard = () => {
       { label: 'Todas', status: 'all'},
       { label: 'Em Análise', status: ApplicationStatus.EM_ANALISE },
       { label: 'Doc. Incompleta', status: ApplicationStatus.DOCUMENTACAO_INCOMPLETA },
+      { label: 'Deferidos', status: ApplicationStatus.ANALISE_CONCLUIDA },
       { label: 'Em Recurso', status: ApplicationStatus.EM_RECURSO },
   ]
 

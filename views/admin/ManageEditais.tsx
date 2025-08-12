@@ -1,4 +1,6 @@
 
+
+
 import React, { useState, useEffect } from 'react';
 import { Edital, EditalModalities, EditalFormData, VacancyDetail, VacancyType, VacancyShift } from '../../types';
 import { api } from '../../services/mockApi';
@@ -83,6 +85,17 @@ const ManageEditais = () => {
       closeConfirmModal();
     }
   };
+  
+  const handleToggleActive = async (edital: Edital) => {
+    try {
+        const updatedData = { ...edital, inscriptionStart: edital.inscriptionStart.split('T')[0], inscriptionEnd: edital.inscriptionEnd.split('T')[0], analysisStart: edital.analysisStart.split('T')[0], analysisEnd: edital.analysisEnd.split('T')[0], preliminaryResultDate: edital.preliminaryResultDate.split('T')[0], appealStartDate: edital.appealStartDate.split('T')[0], appealEndDate: edital.appealEndDate.split('T')[0], resultDate: edital.resultDate.split('T')[0], vacancyAcceptanceDate: edital.vacancyAcceptanceDate.split('T')[0] };
+        await api.updateEdital(edital.id, { ...updatedData, isActive: !edital.isActive });
+        addToast(`Edital ${edital.isActive ? 'desativado' : 'ativado'} com sucesso!`, 'success');
+        fetchEditais();
+    } catch (err) {
+        addToast(err instanceof Error ? err.message : 'Erro ao atualizar status do edital.', 'error');
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -95,7 +108,7 @@ const ManageEditais = () => {
           {isLoading ? (
             <Spinner />
           ) : (
-            <EditalTable editais={editais} onEdit={openModalForEdit} onDelete={openConfirmModal} />
+            <EditalTable editais={editais} onEdit={openModalForEdit} onDelete={openConfirmModal} onToggleActive={handleToggleActive} />
           )}
         </CardContent>
       </Card>
@@ -112,18 +125,20 @@ const ManageEditais = () => {
         onClose={closeConfirmModal}
         onConfirm={handleDelete}
         title="Confirmar Exclusão"
-        message="Tem certeza que deseja excluir este edital? Esta ação não pode ser desfeita."
+        message="Tem certeza que deseja excluir este edital? Esta ação e suas chamadas complementares serão removidas. A ação não pode ser desfeita."
+        confirmButtonText="Confirmar Exclusão"
       />
     </div>
   );
 };
 
-const EditalTable = ({ editais, onEdit, onDelete }: { editais: Edital[]; onEdit: (edital: Edital) => void; onDelete: (id: string) => void; }) => {
+const EditalTable = ({ editais, onEdit, onDelete, onToggleActive }: { editais: Edital[]; onEdit: (edital: Edital) => void; onDelete: (id: string) => void; onToggleActive: (edital: Edital) => void; }) => {
   return (
     <div className="overflow-x-auto">
       <table className="min-w-full divide-y divide-gray-200 dark:divide-slate-700">
         <thead className="bg-gray-50 dark:bg-slate-700/50">
           <tr>
+            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Status</th>
             <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Número</th>
             <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Modalidade</th>
             <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Vagas</th>
@@ -134,7 +149,23 @@ const EditalTable = ({ editais, onEdit, onDelete }: { editais: Edital[]; onEdit:
         </thead>
         <tbody className="bg-white dark:bg-slate-800 divide-y divide-gray-200 dark:divide-slate-700">
           {editais.map(edital => (
-            <tr key={edital.id}>
+            <tr key={edital.id} className={`${!edital.isActive ? 'bg-slate-50 dark:bg-slate-800/60 opacity-60' : ''}`}>
+              <td className="px-6 py-4 whitespace-nowrap">
+                <button
+                    onClick={() => onToggleActive(edital)}
+                    className={`relative inline-flex flex-shrink-0 h-6 w-11 border-2 border-transparent rounded-full cursor-pointer transition-colors ease-in-out duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-cep-primary ${
+                        edital.isActive ? 'bg-cep-primary' : 'bg-gray-300 dark:bg-slate-600'
+                    }`}
+                    title={edital.isActive ? 'Desativar Edital' : 'Ativar Edital'}
+                >
+                    <span
+                        aria-hidden="true"
+                        className={`inline-block h-5 w-5 rounded-full bg-white shadow transform ring-0 transition ease-in-out duration-200 ${
+                            edital.isActive ? 'translate-x-5' : 'translate-x-0'
+                        }`}
+                    />
+                </button>
+              </td>
               <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-cep-text dark:text-white">{edital.number}</td>
               <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">{edital.modality}</td>
               <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">{edital.vacancyDetails.reduce((sum, v) => sum + v.count, 0)}</td>
@@ -161,7 +192,7 @@ const EditalTable = ({ editais, onEdit, onDelete }: { editais: Edital[]; onEdit:
 };
 
 const EditalFormModal = ({ isOpen, onClose, onSave, edital }: { isOpen: boolean; onClose: () => void; onSave: (data: EditalFormData) => void; edital: Edital | null; }) => {
-  const [formData, setFormData] = useState<EditalFormData>({
+  const [formData, setFormData] = useState<Omit<Edital, 'id'>>({
     number: '',
     modality: EditalModalities.FUNDAMENTAL_6_ANO,
     vacancyDetails: [],
@@ -176,6 +207,7 @@ const EditalFormModal = ({ isOpen, onClose, onSave, edital }: { isOpen: boolean;
     resultDate: '',
     vacancyAcceptanceDate: '',
     customRequirements: [],
+    isActive: true,
     ...(edital ? { 
         ...edital, 
         vacancyDetails: edital.vacancyDetails || [],
@@ -251,7 +283,9 @@ const EditalFormModal = ({ isOpen, onClose, onSave, edital }: { isOpen: boolean;
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSaving(true);
-    await onSave(formData);
+    // Cast formData to EditalFormData before saving
+    const { id, ...formDataToSave } = formData as Edital;
+    await onSave(formDataToSave);
     setIsSaving(false);
   };
 
@@ -315,14 +349,15 @@ const EditalFormModal = ({ isOpen, onClose, onSave, edital }: { isOpen: boolean;
         </div>
         <div className="grid grid-cols-2 gap-4">
             <Input id="resultDate" name="resultDate" label="Data de Divulgação dos Resultados Finais" type="date" value={formData.resultDate} onChange={handleChange} required />
-            <Input id="vacancyAcceptanceDate" name="vacancyAcceptanceDate" label="Data de Aceite da Vaga" type="date" value={formData.vacancyAcceptanceDate} onChange={handleChange} required />
+            <Input id="vacancyAcceptanceDate" name="vacancyAcceptanceDate" label="Data Final de Aceite da Vaga" type="date" value={formData.vacancyAcceptanceDate} onChange={handleChange} required />
         </div>
 
         <div className="space-y-2 pt-4 border-t dark:border-slate-700">
-            <h3 className="text-lg font-medium text-cep-text dark:text-white">Requisitos de Documentos Adicionais</h3>
+            <h3 className="text-lg font-medium text-cep-text dark:text-white">Itens de Checklist Adicionais</h3>
+            <p className="text-sm text-slate-500 dark:text-slate-400">Adicione requisitos que não são documentos (ex: "Candidato reside em Curitiba"). Eles aparecerão como um checklist para o analista.</p>
             <div className="space-y-2 max-h-40 overflow-y-auto pr-2 rounded-md bg-slate-50 dark:bg-slate-800/50 p-2 border dark:border-slate-700">
                 {(formData.customRequirements || []).length === 0 ? (
-                    <p className="text-sm text-slate-500 dark:text-slate-400 text-center py-2">Nenhum requisito adicional.</p>
+                    <p className="text-sm text-slate-500 dark:text-slate-400 text-center py-2">Nenhum item de checklist.</p>
                 ) : (formData.customRequirements || []).map(req => (
                     <div key={req.id} className="flex items-center justify-between p-2 text-sm bg-white dark:bg-slate-700 rounded-md shadow-sm">
                         <span>{req.label}</span>
@@ -336,10 +371,11 @@ const EditalFormModal = ({ isOpen, onClose, onSave, edital }: { isOpen: boolean;
                 <Input 
                     id="newRequirement"
                     name="newRequirement"
-                    label="Nome do novo requisito"
+                    label="Novo item de checklist"
                     value={newRequirement}
                     onChange={e => setNewRequirement(e.target.value)}
                     className="flex-grow"
+                    placeholder="Digite o texto do requisito"
                     onKeyDown={(e) => {
                         if (e.key === 'Enter') {
                             e.preventDefault();

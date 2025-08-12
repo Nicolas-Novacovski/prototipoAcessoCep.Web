@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef } from 'react';
 import * as pdfjsLib from 'pdfjs-dist';
 import Spinner from './Spinner';
@@ -14,6 +15,7 @@ interface PdfViewerProps {
 
 const PdfViewer: React.FC<PdfViewerProps> = ({ fileUrl }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
   const [pdfDoc, setPdfDoc] = useState<any>(null);
   const [pageNum, setPageNum] = useState(1);
   const [numPages, setNumPages] = useState(0);
@@ -46,24 +48,37 @@ const PdfViewer: React.FC<PdfViewerProps> = ({ fileUrl }) => {
   }, [fileUrl]);
 
   useEffect(() => {
-    if (!pdfDoc) return;
+    if (!pdfDoc || !canvasRef.current || !containerRef.current) return;
 
     const renderPage = async () => {
-      const page = await pdfDoc.getPage(pageNum);
-      const viewport = page.getViewport({ scale: 1.5 });
-      const canvas = canvasRef.current;
-      if (canvas) {
+       try {
+        const page = await pdfDoc.getPage(pageNum);
+        const container = containerRef.current;
+        const canvas = canvasRef.current;
         const context = canvas.getContext('2d');
+        if (!context) return;
+        
+        const viewportDefault = page.getViewport({ scale: 1 });
+        
+        const scale = Math.min(
+            (container.clientWidth - 16) / viewportDefault.width,
+            (container.clientHeight - 16) / viewportDefault.height
+        );
+
+        const viewport = page.getViewport({ scale: scale });
+
         canvas.height = viewport.height;
         canvas.width = viewport.width;
-        
-        if(context) {
-            const renderContext = {
-              canvasContext: context,
-              viewport: viewport,
-            };
-            page.render(renderContext);
-        }
+
+        const renderContext = {
+          canvasContext: context,
+          viewport: viewport,
+        };
+        await page.render(renderContext).promise;
+
+      } catch (err) {
+        console.error("Error rendering page:", err);
+        setError("Erro ao renderizar a página do PDF.");
       }
     };
 
@@ -93,8 +108,8 @@ const PdfViewer: React.FC<PdfViewerProps> = ({ fileUrl }) => {
 
       {pdfDoc && !error && (
         <>
-          <div className="flex-1 overflow-auto flex justify-center items-start p-2">
-            <canvas ref={canvasRef} />
+          <div ref={containerRef} className="flex-1 overflow-auto flex justify-center items-center p-2">
+            <canvas ref={canvasRef} className="shadow-lg" />
           </div>
           <div className="flex-shrink-0 flex items-center justify-center p-2 bg-black bg-opacity-20 dark:bg-black/40 rounded">
             <Button onClick={onPrevPage} disabled={pageNum <= 1} variant="secondary">Anterior</Button>

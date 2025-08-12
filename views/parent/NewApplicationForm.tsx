@@ -1,9 +1,10 @@
 
+
 import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
 import { useToast, ToastType } from '../../hooks/useToast';
-import { Student, Edital, ApplicationStatus, ValidationStatus, EditalModalities, Document, Address } from '../../types';
+import { Student, Edital, ApplicationStatus, ValidationStatus, EditalModalities, Document, Address, User, Application } from '../../types';
 import { api } from '../../services/mockApi';
 import Card, { CardContent, CardHeader, CardTitle } from '../../components/ui/Card';
 import Button from '../../components/ui/Button';
@@ -87,7 +88,7 @@ const DocumentUploadSlot = ({
   return (
     <div className="p-4 border dark:border-slate-700 rounded-lg bg-gray-50/50 dark:bg-slate-800/30">
       <h4 className="font-medium text-cep-text dark:text-slate-200">
-        {docType.label} {docType.required && <span className="text-red-500">*</span>}
+        {docType.label}
       </h4>
       {files.length > 0 && (
         <ul className="space-y-2 mt-2">
@@ -132,7 +133,11 @@ const NewApplicationForm = () => {
   
   const [newStudentName, setNewStudentName] = useState('');
   const [newStudentBirthDate, setNewStudentBirthDate] = useState('');
-
+  const [newStudentRg, setNewStudentRg] = useState('');
+  const [newStudentUf, setNewStudentUf] = useState('');
+  
+  const [responsibleName, setResponsibleName] = useState(user?.name || '');
+  const [responsibleCpf, setResponsibleCpf] = useState(user?.cpf || '');
   const [contactEmail, setContactEmail] = useState(user?.email || '');
   const [contactPhone, setContactPhone] = useState(user?.phone || '');
   
@@ -162,7 +167,7 @@ const NewApplicationForm = () => {
     const allSteps: { id: MainStep, label: string, icon: React.ReactNode }[] = [
         { id: 'MODALIDADE', label: 'Modalidade', icon: <IconBookOpen /> },
         { id: 'CANDIDATO', label: 'Candidato', icon: <IconUserCircle /> },
-        { id: 'RESPONSAVEL', label: 'Responsável', icon: <IconShieldCheck /> },
+        { id: 'RESPONSAVEL', label: 'Cadastro do Responsável', icon: <IconShieldCheck /> },
         { id: 'RESIDENCIA', label: 'Residência', icon: <IconHome /> },
         { id: 'DOCUMENTOS', label: 'Documentos', icon: <IconFileText /> },
         { id: 'REVISAO', label: 'Revisão', icon: <IconEye /> },
@@ -181,7 +186,7 @@ const NewApplicationForm = () => {
         api.getEditais()
       ]).then(([studentData, editalData]) => {
         setStudents(studentData);
-        setEditais(editalData);
+        setEditais(editalData.filter(e => e.isActive));
       }).finally(() => setIsLoading(false));
     }
   }, [user]);
@@ -221,7 +226,9 @@ const NewApplicationForm = () => {
     docs.push(...commonDocs);
 
     // Special needs document
-    docs.push({ id: 'laudo', label: 'Laudo médico (se aplicável)', required: hasSpecialNeeds, multiple: false });
+    if (hasSpecialNeeds) {
+        docs.push({ id: 'laudo', label: 'Laudo médico (se aplicável)', required: true, multiple: false });
+    }
     
     // Custom requirements from edital
     if (selectedEdital?.customRequirements) {
@@ -325,48 +332,85 @@ const NewApplicationForm = () => {
     }
   };
 
-  const handleCreatePrivateStudent = async (e: React.FormEvent) => {
+  const handleCreatePrivateStudent = (e: React.FormEvent) => {
     e.preventDefault();
     if (!newStudentName || !newStudentBirthDate || !user) return;
-    setIsSubmitting(true);
-    try {
-      const newStudent = await api.createStudent(newStudentName, newStudentBirthDate, user.cpf);
-      setStudents(prev => [...prev, newStudent]);
-      setSelectedStudent(newStudent);
-      addToast(`Aluno ${newStudent.name} cadastrado.`, 'success');
-      handleNextStep();
-    } catch (err) {
-      addToast(err instanceof Error ? err.message : 'Erro ao cadastrar aluno', 'error');
-    } finally {
-      setIsSubmitting(false);
+    if (!newStudentRg || !newStudentUf) {
+        addToast('RG e UF são obrigatórios para alunos de escolas particulares.', 'error');
+        return;
     }
+    // Create a temporary student object, CPF will be filled in the next step
+    const tempStudent: Student = {
+        id: `temp-${Date.now()}`, // temporary id
+        name: newStudentName,
+        birthDate: newStudentBirthDate,
+        responsibleCpf: '', // Will be set in the next step
+        rg: newStudentRg,
+        uf: newStudentUf,
+    };
+    setSelectedStudent(tempStudent);
+    handleNextStep();
   };
   
-  const handleConfirmContact = async (e: React.FormEvent) => {
+  const handleConfirmContact = (e: React.FormEvent) => {
     e.preventDefault();
     if (!user) return;
     if (!contactEmail.includes('@') || contactPhone.replace(/\D/g, '').length < 10) {
         addToast('Por favor, insira um e-mail e telefone válidos.', 'error');
         return;
     }
-    setIsSubmitting(true);
-    try {
-        await api.updateUser(user.id, { email: contactEmail, phone: contactPhone });
-        updateUserContext({ email: contactEmail, phone: contactPhone });
-        addToast('Dados de contato atualizados!', 'success');
-        handleNextStep();
-    } catch(err) {
-        addToast(err instanceof Error ? err.message : 'Erro ao atualizar contato.', 'error');
-    } finally {
-        setIsSubmitting(false);
+    if (originFlow === 'PRIVATE') {
+        if (!responsibleName.trim()) {
+            addToast('Por favor, preencha o nome do responsável.', 'error');
+            return;
+        }
+        const cleanedCpf = responsibleCpf.replace(/\D/g, '');
+        if (cleanedCpf.length !== 11) {
+            addToast('Por favor, insira um CPF válido com 11 dígitos.', 'error');
+            return;
+        }
     }
+    handleNextStep();
   };
 
   const handleSubmit = async () => {
-    if (!selectedStudent || !selectedEdital) return;
+    if (!selectedEdital || !user) return;
+
     setIsSubmitting(true);
     try {
-      const newApplication = await api.createApplication(selectedStudent.id, selectedEdital.id, hasSpecialNeeds, siblingCgm);
+      let finalStudent = selectedStudent;
+
+      // Handle private school student creation
+      if (originFlow === 'PRIVATE' && finalStudent && finalStudent.id.startsWith('temp-')) {
+          const cleanedCpf = responsibleCpf.replace(/\D/g, '');
+          const createdStudent = await api.createStudent(
+              finalStudent.name,
+              finalStudent.birthDate,
+              cleanedCpf,
+              finalStudent.rg,
+              finalStudent.uf,
+          );
+          setStudents(prev => [...prev, createdStudent]);
+          finalStudent = createdStudent;
+      }
+      
+      if (!finalStudent) {
+          throw new Error("Candidato não selecionado ou criado.");
+      }
+      
+      // For public flow, responsible person is the logged-in user. Update their contact info if changed.
+      if (originFlow === 'PUBLIC') {
+          const userDataToUpdate: Partial<User> = {};
+          if (user.email !== contactEmail) userDataToUpdate.email = contactEmail;
+          if (user.phone !== contactPhone) userDataToUpdate.phone = contactPhone;
+
+          if (Object.keys(userDataToUpdate).length > 0) {
+              await api.updateUser(user.id, userDataToUpdate);
+              updateUserContext(userDataToUpdate);
+          }
+      }
+
+      const newApplication = await api.createApplication(finalStudent.id, selectedEdital.id, hasSpecialNeeds, siblingCgm);
       const filesToUpload = Object.values(docFiles).flat();
       const documentsForApp: Document[] = filesToUpload.map((file, i) => ({
         id: `d-new-${Date.now()}-${i}`,
@@ -375,43 +419,29 @@ const NewApplicationForm = () => {
         validationStatus: ValidationStatus.PENDENTE
       }));
       
-      const finalApplication = await api.updateApplication(newApplication.id, {
+      const updatePayload: Partial<Application> = {
         documents: documentsForApp,
         status: ApplicationStatus.EM_ANALISE,
         address: originFlow === 'PRIVATE' ? address : undefined,
-      });
-
-      // Send notification email in the background
-      const sendNotificationEmail = async () => {
-        if (!selectedStudent) return;
-        
-        const formData = new FormData();
-        formData.append('_subject', `Nova Inscrição Recebida: ${selectedStudent.name}`);
-        formData.append('_template', 'table');
-        formData.append('Candidato', selectedStudent.name);
-        formData.append('Protocolo', finalApplication.protocol);
-        formData.append('Edital', `${finalApplication.edital.number} - ${finalApplication.edital.modality}`);
-        formData.append('Data de Envio', new Date(finalApplication.submissionDate).toLocaleString('pt-BR'));
-        formData.append('Mensagem', 'A inscrição foi recebida com sucesso e está aguardando análise.');
-        formData.append('_captcha', 'false');
-
-        try {
-          const response = await fetch('https://formsubmit.co/nicolas.vendrami@gmail.com', {
-            method: 'POST',
-            headers: {
-              'Accept': 'application/json'
-            },
-            body: formData,
-          });
-          const data = await response.json();
-          console.log('Resposta do serviço de e-mail:', data);
-        } catch (emailError) {
-          console.error("Falha ao enviar e-mail de notificação:", emailError);
-          // Do not block user flow or show an error toast.
-        }
       };
 
-      sendNotificationEmail();
+      if (originFlow === 'PRIVATE') {
+          updatePayload.responsibleName = responsibleName;
+          updatePayload.responsibleEmail = contactEmail;
+          updatePayload.responsiblePhone = contactPhone;
+      }
+      
+      const finalApplication = await api.updateApplication(newApplication.id, updatePayload);
+
+
+      // Send notification email using the new template system
+      api.sendEmail('Confirmação de Inscrição', {
+        recipientEmail: contactEmail,
+        studentName: finalStudent.name,
+        protocol: finalApplication.protocol,
+        edital: `${finalApplication.edital.number} - ${finalApplication.edital.modality}`,
+        submissionDate: new Date(finalApplication.submissionDate).toLocaleString('pt-BR'),
+      });
 
       addToast('Inscrição realizada com sucesso!', 'success');
       navigate(`/inscricao/${finalApplication.id}`);
@@ -483,7 +513,41 @@ const NewApplicationForm = () => {
                 <form onSubmit={handleCreatePrivateStudent} className="space-y-4">
                   <Input id="newStudentName" label="Nome Completo do Aluno" value={newStudentName} onChange={e => setNewStudentName(e.target.value)} required />
                   <Input id="newStudentBirthDate" label="Data de Nascimento" type="date" value={newStudentBirthDate} onChange={e => setNewStudentBirthDate(e.target.value)} required />
-                  <div className="flex justify-between mt-6 pt-4 border-t dark:border-slate-700"><Button onClick={handlePrevStep} variant='secondary'>Voltar</Button><Button type="submit" isLoading={isSubmitting}>Salvar e Continuar</Button></div>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <Input 
+                        id="newStudentRg" 
+                        label="RG do Aluno" 
+                        value={newStudentRg} 
+                        onChange={(e) => {
+                            let value = e.target.value.replace(/\D/g, "");
+                            value = value.slice(0, 9);
+                            if (value.length > 8) {
+                                value = `${value.slice(0, 2)}.${value.slice(2, 5)}.${value.slice(5, 8)}-${value.slice(8)}`;
+                            } else if (value.length > 5) {
+                                value = `${value.slice(0, 2)}.${value.slice(2, 5)}.${value.slice(5)}`;
+                            } else if (value.length > 2) {
+                                value = `${value.slice(0, 2)}.${value.slice(2)}`;
+                            }
+                            setNewStudentRg(value);
+                        }} 
+                        required 
+                        className="sm:col-span-2" 
+                        maxLength={12}
+                    />
+                    <Input 
+                        id="newStudentUf" 
+                        label="UF Emissor" 
+                        value={newStudentUf} 
+                        onChange={e => {
+                            const value = e.target.value.replace(/[^a-zA-Z]/g, '').toUpperCase();
+                            setNewStudentUf(value.slice(0, 2));
+                        }} 
+                        required 
+                        className="sm:col-span-1" 
+                        maxLength={2}
+                    />
+                  </div>
+                  <div className="flex justify-between mt-6 pt-4 border-t dark:border-slate-700"><Button onClick={handlePrevStep} variant='secondary'>Voltar</Button><Button type="submit">Salvar e Continuar</Button></div>
                 </form>
               </CardContent>
             </Card>
@@ -494,7 +558,7 @@ const NewApplicationForm = () => {
             <Card>
               <CardHeader>
                 <div className="flex items-center gap-2">
-                    <CardTitle>3. Contato do Responsável</CardTitle>
+                    <CardTitle>3. Cadastro do Responsável</CardTitle>
                     <div className="group relative flex items-center">
                         <IconInfo className="h-5 w-5 text-slate-400 dark:text-slate-500 cursor-help" />
                         <div className="absolute bottom-full left-1/2 -translate-x-1/2 z-10 mb-2 w-72 p-3 bg-slate-700 dark:bg-slate-800 text-white dark:text-slate-200 text-xs font-normal rounded-lg shadow-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
@@ -506,10 +570,32 @@ const NewApplicationForm = () => {
               </CardHeader>
               <CardContent>
                 <form onSubmit={handleConfirmContact} className="space-y-4">
-                  <Input id="responsibleCpf" label="CPF do Responsável" value={user?.cpf || ''} disabled />
+                  <Input 
+                    id="responsibleName" 
+                    label="Nome Completo do(a) Responsável Legal" 
+                    value={responsibleName}
+                    onChange={e => setResponsibleName(e.target.value)}
+                    disabled={originFlow !== 'PRIVATE'}
+                    required
+                  />
+                  <Input 
+                    id="responsibleCpf" 
+                    label="CPF do Responsável Legal"
+                    value={responsibleCpf}
+                    onChange={(e) => {
+                        let v = e.target.value.replace(/\D/g, '').slice(0, 11);
+                        v = v.replace(/(\d{3})(\d)/, '$1.$2');
+                        v = v.replace(/(\d{3})(\d)/, '$1.$2');
+                        v = v.replace(/(\d{3})(\d{1,2})$/, '$1-$2');
+                        setResponsibleCpf(v);
+                    }}
+                    disabled={originFlow !== 'PRIVATE'}
+                    maxLength={14}
+                    required={originFlow === 'PRIVATE'}
+                   />
                   <Input id="contactEmail" label="E-mail do Responsável" type="email" value={contactEmail} onChange={e => setContactEmail(e.target.value)} required />
                   <Input id="contactPhone" label="Telefone com DDD" type="tel" value={contactPhone} onChange={e => setContactPhone(e.target.value)} required placeholder="(XX) XXXXX-XXXX" />
-                  <div className="flex justify-between mt-6 pt-4 border-t dark:border-slate-700"><Button onClick={handlePrevStep} variant='secondary'>Voltar</Button><Button type="submit" isLoading={isSubmitting}>Confirmar e Continuar</Button></div>
+                  <div className="flex justify-between mt-6 pt-4 border-t dark:border-slate-700"><Button onClick={handlePrevStep} variant='secondary'>Voltar</Button><Button type="submit">Confirmar e Continuar</Button></div>
                 </form>
               </CardContent>
             </Card>
@@ -562,9 +648,27 @@ const NewApplicationForm = () => {
                 <Input id="siblingCgm" label="CGM do Irmão (critério de desempate)" value={siblingCgm} onChange={e => setSiblingCgm(e.target.value)} placeholder="Opcional" />
                 <div className="relative flex items-start"><div className="flex h-5 items-center"><input id="specialNeeds" type="checkbox" className="h-4 w-4 rounded border-gray-300 dark:border-slate-600 text-cep-primary focus:ring-cep-primary" checked={hasSpecialNeeds} onChange={(e) => setHasSpecialNeeds(e.target.checked)} /></div><div className="ml-3 text-sm"><label htmlFor="specialNeeds" className="font-medium text-cep-text dark:text-slate-200">Candidato concorre em modalidade de Educação Especial?</label></div></div>
                 <div className="space-y-4">
-                    {allDocTypes.filter(dt => dt.required).map(docType => (
-                        <DocumentUploadSlot key={docType.id} docType={docType} files={docFiles[docType.id] || []} onFileSelect={handleFileSelect} onFileRemove={handleFileRemove} onPreview={setPreviewFile} addToast={addToast} />
-                    ))}
+                    {allDocTypes.filter(dt => dt.required).map(docType => {
+                         if (docType.id === 'laudo') {
+                            return (
+                                <div key={docType.id} className="p-4 border dark:border-slate-700 rounded-lg bg-gray-50/50 dark:bg-slate-800/30">
+                                    <div className="flex items-center gap-2">
+                                        <h4 className="font-medium text-cep-text dark:text-slate-200">
+                                            {docType.label}
+                                        </h4>
+                                        <div className="group relative flex items-center">
+                                            <IconInfo className="h-5 w-5 text-slate-400 dark:text-slate-500 cursor-help" />
+                                            <div className="absolute bottom-full left-1/2 -translate-x-1/2 z-10 mb-2 w-72 p-3 bg-slate-700 dark:bg-slate-800 text-white dark:text-slate-200 text-xs font-normal rounded-lg shadow-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
+                                                Apenas laudos médicos oficiais são permitidos. Declarações médicas simples não serão aceitas.
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <DocumentUploadSlot docType={{...docType, label: ''}} files={docFiles[docType.id] || []} onFileSelect={handleFileSelect} onFileRemove={handleFileRemove} onPreview={setPreviewFile} addToast={addToast} />
+                                </div>
+                            );
+                         }
+                         return <DocumentUploadSlot key={docType.id} docType={docType} files={docFiles[docType.id] || []} onFileSelect={handleFileSelect} onFileRemove={handleFileRemove} onPreview={setPreviewFile} addToast={addToast} />
+                    })}
                 </div>
                 <div className="flex justify-between mt-6 pt-4 border-t dark:border-slate-700"><Button onClick={handlePrevStep} variant='secondary'>Voltar</Button><Button onClick={handleNextStep}>Continuar para Revisão</Button></div>
             </CardContent>
@@ -579,8 +683,15 @@ const NewApplicationForm = () => {
                 <CardContent className="space-y-6">
                     <div className="space-y-4">
                         <div><h4 className="font-semibold text-lg text-cep-text dark:text-white">Modalidade</h4><p>{selectedEdital?.number} - {selectedEdital?.modality}</p></div>
-                        <div><h4 className="font-semibold text-lg text-cep-text dark:text-white">Candidato</h4><p>{selectedStudent?.name}</p><p className="text-sm text-gray-500 dark:text-gray-400">Nascimento: {selectedStudent ? new Date(selectedStudent.birthDate).toLocaleDateString() : ''}</p></div>
-                        <div><h4 className="font-semibold text-lg text-cep-text dark:text-white">Responsável</h4><p>{user?.name}</p><p className="text-sm text-gray-500 dark:text-gray-400">Email: {contactEmail} | Telefone: {contactPhone}</p></div>
+                        <div>
+                            <h4 className="font-semibold text-lg text-cep-text dark:text-white">Candidato</h4>
+                            <p>{selectedStudent?.name}</p>
+                            <p className="text-sm text-gray-500 dark:text-gray-400">Nascimento: {selectedStudent ? new Date(selectedStudent.birthDate).toLocaleDateString() : ''}</p>
+                             {originFlow === 'PRIVATE' && selectedStudent?.rg && (
+                                <p className="text-sm text-gray-500 dark:text-gray-400">RG: {selectedStudent.rg} - {selectedStudent.uf}</p>
+                            )}
+                        </div>
+                        <div><h4 className="font-semibold text-lg text-cep-text dark:text-white">Responsável</h4><p>{responsibleName}</p><p className="text-sm text-gray-500 dark:text-gray-400">CPF: {responsibleCpf} | Email: {contactEmail} | Telefone: {contactPhone}</p></div>
                         {originFlow === 'PRIVATE' && (
                             <div>
                                 <h4 className="font-semibold text-lg text-cep-text dark:text-white">Endereço</h4>
@@ -621,7 +732,11 @@ const NewApplicationForm = () => {
             </CardHeader>
             <CardContent className="grid md:grid-cols-2 gap-6 pt-6">
               <Button size="lg" onClick={() => setOriginFlow('PUBLIC')}>Aluno da Rede Pública (SERE)</Button>
-              <Button size="lg" variant="secondary" onClick={() => setOriginFlow('PRIVATE')}>Aluno de Escola Particular</Button>
+              <Button size="lg" variant="secondary" onClick={() => {
+                  setOriginFlow('PRIVATE');
+                  setResponsibleName('');
+                  setResponsibleCpf('');
+              }}>Aluno de Escola Particular</Button>
             </CardContent>
           </Card>
       ) : (

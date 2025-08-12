@@ -1,3 +1,7 @@
+
+
+
+
 import React from 'react';
 import { HashRouter, Routes, Route, Navigate, Outlet } from 'react-router-dom';
 import { AuthProvider, useAuth } from './hooks/useAuth';
@@ -12,12 +16,16 @@ import { UserRole } from './types';
 import NewApplicationForm from './views/parent/NewApplicationForm';
 import ApplicationDetail from './views/parent/ApplicationDetail';
 import ManageEditais from './views/admin/ManageEditais';
+import ManageComplementaryCalls from './views/admin/ManageComplementaryCalls';
 import MonitorAnalyses from './views/admin/MonitorAnalyses';
 import ManageUsers from './views/admin/ManageUsers';
 import Reports from './views/admin/Reports';
 import Settings from './views/admin/Settings';
 import Home from './views/Home';
 import { ThemeProvider } from './hooks/useTheme';
+import RankingView from './views/admin/RankingView';
+import ManageEmailTemplates from './views/admin/ManageEmailTemplates';
+import ManageSpecialCases from './views/admin/ManageSpecialCases';
 
 const ProtectedRoute = ({ allowedRoles }: { allowedRoles?: UserRole[] }) => {
     const { isAuthenticated, user } = useAuth();
@@ -47,15 +55,25 @@ const AppRoutes = () => {
                     <Route path="/inscricao/nova" element={<NewApplicationForm />} />
                     <Route path="/inscricao/:id" element={<ApplicationDetail />} />
 
-                    {/* Analyst Routes */}
-                    <Route path="/analise/:id" element={<AnalysisView />} />
+                    {/* Analyst & Admin Routes */}
+                    <Route element={<ProtectedRoute allowedRoles={[UserRole.ANALISTA, UserRole.ADMIN_CEP, UserRole.ADMIN_SEED]} />}>
+                      <Route path="/analise/:id" element={<AnalysisView />} />
+                      <Route path="/classificacao" element={<RankingView />} />
+                    </Route>
 
                     {/* Admin Routes */}
                     <Route element={<ProtectedRoute allowedRoles={[UserRole.ADMIN_CEP, UserRole.ADMIN_SEED]} />}>
                         <Route path="/admin/editais" element={<ManageEditais />} />
+                        <Route path="/admin/chamadas" element={<ManageComplementaryCalls />} />
                         <Route path="/admin/analises" element={<MonitorAnalyses />} />
                         <Route path="/admin/usuarios" element={<ManageUsers />} />
                         <Route path="/admin/relatorios" element={<Reports />} />
+                        <Route path="/admin/email-templates" element={<ManageEmailTemplates />} />
+                    </Route>
+
+                    {/* CEP Admin Only Route */}
+                    <Route element={<ProtectedRoute allowedRoles={[UserRole.ADMIN_CEP]} />}>
+                      <Route path="/admin/casos-especiais" element={<ManageSpecialCases />} />
                     </Route>
 
                     {/* SEED Only Route */}
