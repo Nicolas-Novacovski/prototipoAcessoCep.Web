@@ -1,7 +1,5 @@
 
 
-
-
 import React, { useState, useEffect } from 'react';
 import { User, UserRole, PermissionKey, UserPermissions } from '../../types';
 import { api } from '../../services/mockApi';
@@ -26,12 +24,13 @@ const allPermissions: { key: PermissionKey; label: string; }[] = [
     { key: 'view_relatorios', label: 'Gerar Relatórios' },
     { key: 'manage_email_templates', label: 'Gerenciar Templates de E-mail' },
     { key: 'manage_config', label: 'Configurações Globais (SEED)' },
+    { key: 'view_audit_logs', label: 'Visualizar Logs de Auditoria' },
 ];
 
 const cepDelegablePermissions: PermissionKey[] = [
     'manage_editais', 'manage_chamadas', 'manage_analises',
     'manage_casos_especiais', 'view_classificacao', 'manage_usuarios',
-    'view_relatorios', 'manage_email_templates'
+    'view_relatorios', 'manage_email_templates', 'view_audit_logs'
 ];
 
 
@@ -43,6 +42,7 @@ const ManageUsers = () => {
   const [editingUser, setEditingUser] = useState<User | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const { addToast } = useToast();
+  const { user: currentUser } = useAuth();
 
   const fetchUsers = () => {
     setIsLoading(true);
@@ -107,6 +107,24 @@ const ManageUsers = () => {
       closeConfirmModal();
     }
   };
+  
+  const handleToggleActive = async (userToToggle: User) => {
+    try {
+        if(currentUser?.id === userToToggle.id) {
+            addToast('Você não pode desativar seu próprio usuário.', 'error');
+            return;
+        }
+        if(currentUser?.role === UserRole.ADMIN_CEP && userToToggle.role === UserRole.ADMIN_SEED) {
+             addToast('Você não tem permissão para desativar um administrador SEED.', 'error');
+            return;
+        }
+        await api.updateUser(userToToggle.id, { isActive: !userToToggle.isActive });
+        addToast(`Usuário ${userToToggle.isActive ? 'desativado' : 'ativado'} com sucesso!`, 'success');
+        fetchUsers();
+    } catch (err) {
+        addToast(err instanceof Error ? err.message : 'Erro ao atualizar status do usuário.', 'error');
+    }
+  };
 
 
   return (
@@ -117,7 +135,7 @@ const ManageUsers = () => {
       </div>
       <Card>
         <CardContent>
-          {isLoading ? <Spinner /> : <UserTable users={users} onEdit={openModalForEdit} onDelete={openConfirmModal} />}
+          {isLoading ? <Spinner /> : <UserTable users={users} onEdit={openModalForEdit} onDelete={openConfirmModal} onToggleActive={handleToggleActive} currentUser={currentUser} />}
         </CardContent>
       </Card>
       {isModalOpen && (
@@ -140,38 +158,57 @@ const ManageUsers = () => {
   );
 };
 
-const UserTable = ({ users, onEdit, onDelete }: { users: User[]; onEdit: (user: User) => void; onDelete: (id: string) => void; }) => {
+const UserTable = ({ users, onEdit, onDelete, onToggleActive, currentUser }: { users: User[]; onEdit: (user: User) => void; onDelete: (id: string) => void; onToggleActive: (user: User) => void; currentUser: User | null;}) => {
   return (
     <div className="overflow-x-auto">
       <table className="min-w-full divide-y divide-gray-200 dark:divide-slate-700">
         <thead className="bg-gray-50 dark:bg-slate-700/50">
           <tr>
+            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Status</th>
             <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Nome</th>
             <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Email</th>
-            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">CPF</th>
             <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Perfil</th>
             <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Ações</th>
           </tr>
         </thead>
         <tbody className="bg-white dark:bg-slate-800 divide-y divide-gray-200 dark:divide-slate-700">
-          {users.map(user => (
-            <tr key={user.id}>
-              <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-cep-text dark:text-white">{user.name}</td>
-              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">{user.email}</td>
-              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">{user.cpf}</td>
-              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">{user.role}</td>
-              <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium space-x-2">
-                <Button variant="secondary" onClick={() => onEdit(user)} className="p-2 h-auto">
-                  <IconEdit className="h-4 w-4" />
-                </Button>
-                {user.role !== UserRole.ADMIN_SEED && (
-                  <Button variant="danger" onClick={() => onDelete(user.id)} className="p-2 h-auto">
-                    <IconTrash className="h-4 w-4" />
+          {users.map(user => {
+            const canToggle = !(currentUser?.id === user.id || (currentUser?.role === UserRole.ADMIN_CEP && user.role === UserRole.ADMIN_SEED));
+            return (
+              <tr key={user.id} className={`${!user.isActive ? 'opacity-50' : ''}`}>
+                 <td className="px-6 py-4 whitespace-nowrap">
+                   <button
+                        onClick={() => canToggle && onToggleActive(user)}
+                        disabled={!canToggle}
+                        className={`relative inline-flex flex-shrink-0 h-6 w-11 border-2 border-transparent rounded-full cursor-pointer transition-colors ease-in-out duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-cep-primary disabled:cursor-not-allowed disabled:opacity-70 ${
+                            user.isActive ? 'bg-cep-primary' : 'bg-gray-300 dark:bg-slate-600'
+                        }`}
+                        title={user.isActive ? 'Desativar Usuário' : 'Ativar Usuário'}
+                    >
+                        <span
+                            aria-hidden="true"
+                            className={`inline-block h-5 w-5 rounded-full bg-white shadow transform ring-0 transition ease-in-out duration-200 ${
+                                user.isActive ? 'translate-x-5' : 'translate-x-0'
+                            }`}
+                        />
+                    </button>
+                 </td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-cep-text dark:text-white">{user.name}</td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">{user.email}</td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">{user.role}</td>
+                <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium space-x-2">
+                  <Button variant="secondary" onClick={() => onEdit(user)} className="p-2 h-auto">
+                    <IconEdit className="h-4 w-4" />
                   </Button>
-                )}
-              </td>
-            </tr>
-          ))}
+                  {user.role !== UserRole.ADMIN_SEED && (
+                    <Button variant="danger" onClick={() => onDelete(user.id)} className="p-2 h-auto">
+                      <IconTrash className="h-4 w-4" />
+                    </Button>
+                  )}
+                </td>
+              </tr>
+            )
+          })}
         </tbody>
       </table>
     </div>
@@ -188,6 +225,7 @@ const UserFormModal = ({ isOpen, onClose, onSave, user }: { isOpen: boolean; onC
     cpf: '',
     role: UserRole.ANALISTA,
     permissions: {},
+    isActive: true,
     ...user,
   });
   const [isSaving, setIsSaving] = useState(false);

@@ -1,14 +1,10 @@
 
 
-
-
-
-
 import React, { ReactNode } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
 import { UserRole, PermissionKey } from '../../types';
-import { APP_TITLE, IconLayoutDashboard, IconFileText, IconUserCheck, IconSettings, IconUsers, IconBarChart, IconLogOut, IconPlusCircle, IconTrendingUp, IconMail, IconShieldCheck } from '../../constants';
+import { APP_TITLE, IconLayoutDashboard, IconFileText, IconUserCheck, IconSettings, IconUsers, IconBarChart, IconLogOut, IconPlusCircle, IconTrendingUp, IconMail, IconShieldCheck, IconListDetails } from '../../constants';
 
 const adminNavLinksConfig: { key: PermissionKey; to: string; icon: React.ReactNode; label: string; }[] = [
     { key: 'manage_editais', to: '/admin/editais', icon: <IconFileText className="h-5 w-5" />, label: 'Gerenciar Editais' },
@@ -19,6 +15,7 @@ const adminNavLinksConfig: { key: PermissionKey; to: string; icon: React.ReactNo
     { key: 'manage_usuarios', to: '/admin/usuarios', icon: <IconUsers className="h-5 w-5" />, label: 'Gerenciar Usuários' },
     { key: 'view_relatorios', to: '/admin/relatorios', icon: <IconBarChart className="h-5 w-5" />, label: 'Relatórios' },
     { key: 'manage_email_templates', to: '/admin/email-templates', icon: <IconMail className="h-5 w-5" />, label: 'Templates de E-mail' },
+    { key: 'view_audit_logs', to: '/admin/logs', icon: <IconListDetails className="h-5 w-5" />, label: 'Logs de Auditoria' },
     { key: 'manage_config', to: '/admin/config', icon: <IconSettings className="h-5 w-5" />, label: 'Configurações' },
 ];
 
@@ -43,8 +40,10 @@ const Sidebar = () => {
         ];
       case UserRole.ANALISTA:
         return [
-          { to: '/dashboard', icon: <IconLayoutDashboard className="h-5 w-5" />, label: 'Painel de Análise' },
+          { to: '/dashboard', icon: <IconLayoutDashboard className="h-5 w-5" />, label: 'Meu Painel' },
+          { to: '/analise', icon: <IconUserCheck className="h-5 w-5" />, label: 'Fila de Análise' },
           { to: '/classificacao', icon: <IconTrendingUp className="h-5 w-5" />, label: 'Classificação' },
+          { to: '/analise/relatorios', icon: <IconBarChart className="h-5 w-5" />, label: 'Meus Relatórios' },
         ];
       case UserRole.ADMIN_CEP:
       case UserRole.ADMIN_SEED:
@@ -78,6 +77,7 @@ const Sidebar = () => {
           <NavLink
             key={link.to}
             to={link.to}
+            end={link.to === '/dashboard' || link.to === '/analise'}
             className={({ isActive }) =>
               `flex items-center px-3 py-2.5 text-sm font-medium rounded-md transition-colors ${
                 isActive ? 'bg-cep-primary/10 text-cep-primary' : 'hover:bg-slate-100 dark:hover:bg-slate-700'

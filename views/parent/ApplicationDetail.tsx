@@ -1,5 +1,3 @@
-
-
 import React, { useEffect, useState, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Application, Document, ApplicationStatus, ValidationStatus, AppealStatus } from '../../types';
@@ -128,9 +126,13 @@ const AppealForm = ({ applicationId, onAppealSubmitted }: { applicationId: strin
     );
 }
 
-const CountdownTimer = ({ endDate }: { endDate: string }) => {
+const CountdownTimer = ({ startDate, endDate }: { startDate: string, endDate: string }) => {
+    const now = new Date();
+    const start = new Date(startDate);
+    const end = new Date(endDate);
+    
     const calculateTimeLeft = () => {
-        const difference = +new Date(endDate) - +new Date();
+        const difference = +end - +now;
         let timeLeft: { [key: string]: number } = {};
 
         if (difference > 0) {
@@ -152,6 +154,14 @@ const CountdownTimer = ({ endDate }: { endDate: string }) => {
         }, 1000);
         return () => clearTimeout(timer);
     });
+
+    if (now < start) {
+        return (
+            <div className="text-center font-semibold text-blue-500 dark:text-blue-400 p-4 bg-blue-50 dark:bg-blue-900/40 rounded-lg">
+                O período para aceite da vaga iniciará em {start.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' })}.
+            </div>
+        );
+    }
 
     const timerComponents = Object.entries(timeLeft);
 
@@ -423,10 +433,10 @@ const ApplicationDetail = () => {
             <CardHeader><CardTitle>Decisão Final: Aceite de Vaga</CardTitle></CardHeader>
             <CardContent className="text-center space-y-4">
                  <p className="text-lg text-gray-600 dark:text-gray-400">Parabéns! O candidato foi classificado. Você tem um prazo para aceitar ou recusar a vaga.</p>
-                 <CountdownTimer endDate={edital.vacancyAcceptanceDate} />
+                 <CountdownTimer startDate={edital.vacancyAcceptanceStartDate} endDate={edital.vacancyAcceptanceDate} />
                  <div className="flex justify-center gap-4 pt-6">
-                    <Button onClick={handleAcceptVacancy} size="lg">Aceitar Vaga</Button>
-                    <Button onClick={() => setIsDeclineModalOpen(true)} variant="danger" size="lg">Recusar Vaga</Button>
+                    <Button onClick={handleAcceptVacancy} size="lg" disabled={new Date() < new Date(edital.vacancyAcceptanceStartDate) || new Date() > new Date(edital.vacancyAcceptanceDate)}>Aceitar Vaga</Button>
+                    <Button onClick={() => setIsDeclineModalOpen(true)} variant="danger" size="lg" disabled={new Date() < new Date(edital.vacancyAcceptanceStartDate) || new Date() > new Date(edital.vacancyAcceptanceDate)}>Recusar Vaga</Button>
                  </div>
             </CardContent>
         </Card>
@@ -463,7 +473,7 @@ const ApplicationDetail = () => {
         onClose={() => setIsDeclineModalOpen(false)}
         onConfirm={handleDeclineVacancy}
         title="Confirmar Recusa de Vaga"
-        message="Tem certeza que deseja recusar a vaga? Esta ação é irreversível e o candidato perderá a classificação neste edital."
+        message="Tem certeza que deseja recusar a vaga? Esta ação é irreversível e o candidato perderá a classificação neste processo seletivo."
         confirmButtonText="Sim, Recusar Vaga"
         confirmButtonVariant="danger"
       />

@@ -2,7 +2,7 @@
 
 
 import React, { useState, useEffect } from 'react';
-import { Edital, EditalModalities, EditalFormData, VacancyDetail, VacancyType, VacancyShift } from '../../types';
+import { Edital, EditalModalities, EditalFormData, VacancyDetail, VacancyType, VacancyShift, CustomRequirement } from '../../types';
 import { api } from '../../services/mockApi';
 import Card, { CardContent } from '../../components/ui/Card';
 import Button from '../../components/ui/Button';
@@ -88,7 +88,7 @@ const ManageEditais = () => {
   
   const handleToggleActive = async (edital: Edital) => {
     try {
-        const updatedData = { ...edital, inscriptionStart: edital.inscriptionStart.split('T')[0], inscriptionEnd: edital.inscriptionEnd.split('T')[0], analysisStart: edital.analysisStart.split('T')[0], analysisEnd: edital.analysisEnd.split('T')[0], preliminaryResultDate: edital.preliminaryResultDate.split('T')[0], appealStartDate: edital.appealStartDate.split('T')[0], appealEndDate: edital.appealEndDate.split('T')[0], resultDate: edital.resultDate.split('T')[0], vacancyAcceptanceDate: edital.vacancyAcceptanceDate.split('T')[0] };
+        const updatedData = { ...edital, inscriptionStart: edital.inscriptionStart.split('T')[0], inscriptionEnd: edital.inscriptionEnd.split('T')[0], analysisStart: edital.analysisStart.split('T')[0], analysisEnd: edital.analysisEnd.split('T')[0], preliminaryResultDate: edital.preliminaryResultDate.split('T')[0], appealStartDate: edital.appealStartDate.split('T')[0], appealEndDate: edital.appealEndDate.split('T')[0], resultDate: edital.resultDate.split('T')[0], vacancyAcceptanceStartDate: edital.vacancyAcceptanceStartDate.split('T')[0], vacancyAcceptanceDate: edital.vacancyAcceptanceDate.split('T')[0] };
         await api.updateEdital(edital.id, { ...updatedData, isActive: !edital.isActive });
         addToast(`Edital ${edital.isActive ? 'desativado' : 'ativado'} com sucesso!`, 'success');
         fetchEditais();
@@ -175,7 +175,7 @@ const EditalTable = ({ editais, onEdit, onDelete, onToggleActive }: { editais: E
                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
                  <div>Preliminar: {new Date(edital.preliminaryResultDate).toLocaleDateString('pt-BR')}</div>
                  <div>Final: {new Date(edital.resultDate).toLocaleDateString('pt-BR')}</div>
-                 <div>Aceite: {new Date(edital.vacancyAcceptanceDate).toLocaleDateString('pt-BR')}</div>
+                 <div>Aceite: {new Date(edital.vacancyAcceptanceStartDate).toLocaleDateString('pt-BR')} - {new Date(edital.vacancyAcceptanceDate).toLocaleDateString('pt-BR')}</div>
               </td>
               <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium space-x-2">
                 <Button variant="secondary" onClick={() => onEdit(edital)} className="p-2 h-auto">
@@ -205,9 +205,12 @@ const EditalFormModal = ({ isOpen, onClose, onSave, edital }: { isOpen: boolean;
     appealStartDate: '',
     appealEndDate: '',
     resultDate: '',
+    vacancyAcceptanceStartDate: '',
     vacancyAcceptanceDate: '',
     customRequirements: [],
+    additionalDocuments: [],
     isActive: true,
+    editalPdfUrl: '',
     ...(edital ? { 
         ...edital, 
         vacancyDetails: edital.vacancyDetails || [],
@@ -219,11 +222,15 @@ const EditalFormModal = ({ isOpen, onClose, onSave, edital }: { isOpen: boolean;
         appealStartDate: edital.appealStartDate.split('T')[0],
         appealEndDate: edital.appealEndDate.split('T')[0],
         resultDate: edital.resultDate.split('T')[0],
+        vacancyAcceptanceStartDate: edital.vacancyAcceptanceStartDate.split('T')[0],
         vacancyAcceptanceDate: edital.vacancyAcceptanceDate.split('T')[0],
         customRequirements: edital.customRequirements || [],
+        additionalDocuments: edital.additionalDocuments || [],
+        editalPdfUrl: edital.editalPdfUrl || '',
     } : {}),
   });
   const [newRequirement, setNewRequirement] = useState('');
+  const [newDocument, setNewDocument] = useState('');
   const [isSaving, setIsSaving] = useState(false);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
@@ -262,23 +269,26 @@ const EditalFormModal = ({ isOpen, onClose, onSave, edital }: { isOpen: boolean;
     }));
   };
 
-  const handleAddRequirement = () => {
-    if (newRequirement.trim()) {
-      const requirement = { id: `cr-${Date.now()}`, label: newRequirement.trim() };
-      setFormData(prev => ({
-        ...prev,
-        customRequirements: [...(prev.customRequirements || []), requirement]
-      }));
-      setNewRequirement('');
-    }
+  const handleAddRequirement = (type: 'checklist' | 'document') => {
+      if (type === 'checklist' && newRequirement.trim()) {
+          const requirement: CustomRequirement = { id: `cr-${Date.now()}`, label: newRequirement.trim() };
+          setFormData(prev => ({ ...prev, customRequirements: [...(prev.customRequirements || []), requirement] }));
+          setNewRequirement('');
+      } else if (type === 'document' && newDocument.trim()) {
+          const document: CustomRequirement = { id: `ad-${Date.now()}`, label: newDocument.trim() };
+          setFormData(prev => ({ ...prev, additionalDocuments: [...(prev.additionalDocuments || []), document] }));
+          setNewDocument('');
+      }
   };
 
-  const handleRemoveRequirement = (idToRemove: string) => {
-    setFormData(prev => ({
-      ...prev,
-      customRequirements: (prev.customRequirements || []).filter(req => req.id !== idToRemove)
-    }));
+  const handleRemoveRequirement = (idToRemove: string, type: 'checklist' | 'document') => {
+      if (type === 'checklist') {
+          setFormData(prev => ({ ...prev, customRequirements: (prev.customRequirements || []).filter(req => req.id !== idToRemove) }));
+      } else {
+          setFormData(prev => ({ ...prev, additionalDocuments: (prev.additionalDocuments || []).filter(doc => doc.id !== idToRemove) }));
+      }
   };
+
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -288,6 +298,53 @@ const EditalFormModal = ({ isOpen, onClose, onSave, edital }: { isOpen: boolean;
     await onSave(formDataToSave);
     setIsSaving(false);
   };
+  
+  const RequirementManager = ({ title, description, items, onAdd, onRemove, inputValue, onInputChange, placeholder, type }: {
+    title: string;
+    description: string;
+    items: CustomRequirement[];
+    onAdd: () => void;
+    onRemove: (id: string) => void;
+    inputValue: string;
+    onInputChange: (value: string) => void;
+    placeholder: string;
+    type: 'checklist' | 'document';
+  }) => (
+        <div className="space-y-2 pt-4 border-t dark:border-slate-700">
+            <h3 className="text-lg font-medium text-cep-text dark:text-white">{title}</h3>
+            <p className="text-sm text-slate-500 dark:text-slate-400">{description}</p>
+            <div className="space-y-2 max-h-40 overflow-y-auto pr-2 rounded-md bg-slate-50 dark:bg-slate-800/50 p-2 border dark:border-slate-700">
+                {items.length === 0 ? (
+                    <p className="text-sm text-slate-500 dark:text-slate-400 text-center py-2">Nenhum item adicionado.</p>
+                ) : items.map(item => (
+                    <div key={item.id} className="flex items-center justify-between p-2 text-sm bg-white dark:bg-slate-700 rounded-md shadow-sm">
+                        <span>{item.label}</span>
+                        <button type="button" onClick={() => onRemove(item.id)} className="p-1 rounded-full hover:bg-red-100 dark:hover:bg-red-900/50">
+                            <IconTrash className="h-4 w-4 text-red-500"/>
+                        </button>
+                    </div>
+                ))}
+            </div>
+            <div className="flex items-end gap-2 pt-2">
+                <Input 
+                    id={`new-${type}`}
+                    name={`new-${type}`}
+                    label={`Novo ${type === 'checklist' ? 'item de checklist' : 'documento'}`}
+                    value={inputValue}
+                    onChange={e => onInputChange(e.target.value)}
+                    className="flex-grow"
+                    placeholder={placeholder}
+                    onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                            e.preventDefault();
+                            onAdd();
+                        }
+                    }}
+                />
+                <Button type="button" variant="secondary" onClick={onAdd}>Adicionar</Button>
+            </div>
+        </div>
+  );
 
   return (
     <Modal isOpen={isOpen} onClose={onClose} title={edital ? 'Editar Edital' : 'Novo Edital'} size="3xl">
@@ -297,6 +354,7 @@ const EditalFormModal = ({ isOpen, onClose, onSave, edital }: { isOpen: boolean;
           {Object.values(EditalModalities).map(m => <option key={m} value={m}>{m}</option>)}
         </Select>
         <Input id="year" name="year" label="Ano" type="number" value={formData.year} onChange={handleChange} required />
+        <Input id="editalPdfUrl" name="editalPdfUrl" label="URL do PDF do Edital" value={formData.editalPdfUrl || ''} onChange={handleChange} placeholder="https://..." />
         
         <div className="space-y-4 pt-4 border-t dark:border-slate-700">
             <h3 className="text-lg font-medium text-cep-text dark:text-white">Quadro de Vagas</h3>
@@ -347,45 +405,37 @@ const EditalFormModal = ({ isOpen, onClose, onSave, edital }: { isOpen: boolean;
             <Input id="appealStartDate" name="appealStartDate" label="Início do Período de Recursos" type="date" value={formData.appealStartDate} onChange={handleChange} required />
             <Input id="appealEndDate" name="appealEndDate" label="Fim do Período de Recursos" type="date" value={formData.appealEndDate} onChange={handleChange} required />
         </div>
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 gap-4">
             <Input id="resultDate" name="resultDate" label="Data de Divulgação dos Resultados Finais" type="date" value={formData.resultDate} onChange={handleChange} required />
-            <Input id="vacancyAcceptanceDate" name="vacancyAcceptanceDate" label="Data Final de Aceite da Vaga" type="date" value={formData.vacancyAcceptanceDate} onChange={handleChange} required />
         </div>
+        <div className="grid grid-cols-2 gap-4">
+            <Input id="vacancyAcceptanceStartDate" name="vacancyAcceptanceStartDate" label="Início do Aceite da Vaga" type="date" value={formData.vacancyAcceptanceStartDate} onChange={handleChange} required />
+            <Input id="vacancyAcceptanceDate" name="vacancyAcceptanceDate" label="Fim do Aceite da Vaga" type="date" value={formData.vacancyAcceptanceDate} onChange={handleChange} required />
+        </div>
+        
+        <RequirementManager
+            title="Documentos Adicionais"
+            description="Adicione documentos que serão solicitados no formulário de inscrição (ex: 'Declaração de Vacinação')."
+            items={formData.additionalDocuments || []}
+            onAdd={() => handleAddRequirement('document')}
+            onRemove={(id) => handleRemoveRequirement(id, 'document')}
+            inputValue={newDocument}
+            onInputChange={setNewDocument}
+            placeholder="Digite o nome do documento"
+            type="document"
+        />
 
-        <div className="space-y-2 pt-4 border-t dark:border-slate-700">
-            <h3 className="text-lg font-medium text-cep-text dark:text-white">Itens de Checklist Adicionais</h3>
-            <p className="text-sm text-slate-500 dark:text-slate-400">Adicione requisitos que não são documentos (ex: "Candidato reside em Curitiba"). Eles aparecerão como um checklist para o analista.</p>
-            <div className="space-y-2 max-h-40 overflow-y-auto pr-2 rounded-md bg-slate-50 dark:bg-slate-800/50 p-2 border dark:border-slate-700">
-                {(formData.customRequirements || []).length === 0 ? (
-                    <p className="text-sm text-slate-500 dark:text-slate-400 text-center py-2">Nenhum item de checklist.</p>
-                ) : (formData.customRequirements || []).map(req => (
-                    <div key={req.id} className="flex items-center justify-between p-2 text-sm bg-white dark:bg-slate-700 rounded-md shadow-sm">
-                        <span>{req.label}</span>
-                        <button type="button" onClick={() => handleRemoveRequirement(req.id)} className="p-1 rounded-full hover:bg-red-100 dark:hover:bg-red-900/50">
-                            <IconTrash className="h-4 w-4 text-red-500"/>
-                        </button>
-                    </div>
-                ))}
-            </div>
-            <div className="flex items-end gap-2 pt-2">
-                <Input 
-                    id="newRequirement"
-                    name="newRequirement"
-                    label="Novo item de checklist"
-                    value={newRequirement}
-                    onChange={e => setNewRequirement(e.target.value)}
-                    className="flex-grow"
-                    placeholder="Digite o texto do requisito"
-                    onKeyDown={(e) => {
-                        if (e.key === 'Enter') {
-                            e.preventDefault();
-                            handleAddRequirement();
-                        }
-                    }}
-                />
-                <Button type="button" variant="secondary" onClick={handleAddRequirement}>Adicionar</Button>
-            </div>
-        </div>
+        <RequirementManager
+            title="Itens de Checklist Adicionais"
+            description="Adicione requisitos que não são documentos (ex: 'Candidato reside em Curitiba'). Eles aparecerão como um checklist para o analista."
+            items={formData.customRequirements || []}
+            onAdd={() => handleAddRequirement('checklist')}
+            onRemove={(id) => handleRemoveRequirement(id, 'checklist')}
+            inputValue={newRequirement}
+            onInputChange={setNewRequirement}
+            placeholder="Digite o texto do requisito"
+            type="checklist"
+        />
 
         <div className="flex justify-end gap-2 pt-4 border-t dark:border-slate-700">
           <Button type="button" variant="secondary" onClick={onClose}>Cancelar</Button>

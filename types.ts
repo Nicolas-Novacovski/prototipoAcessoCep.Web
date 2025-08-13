@@ -63,7 +63,8 @@ export type PermissionKey =
   | 'manage_usuarios'
   | 'view_relatorios'
   | 'manage_email_templates'
-  | 'manage_config';
+  | 'manage_config'
+  | 'view_audit_logs';
 
 export type UserPermissions = {
   [key in PermissionKey]?: boolean;
@@ -77,6 +78,7 @@ export interface User {
   role: UserRole;
   phone?: string;
   permissions?: UserPermissions;
+  isActive: boolean;
 }
 
 export interface Student {
@@ -124,9 +126,12 @@ export interface Edital {
     appealStartDate: string;
     appealEndDate: string;
     resultDate: string;
+    vacancyAcceptanceStartDate: string;
     vacancyAcceptanceDate: string;
     customRequirements?: CustomRequirement[];
+    additionalDocuments?: CustomRequirement[];
     isActive: boolean;
+    editalPdfUrl?: string;
 }
 
 export type EditalFormData = Omit<Edital, 'id'>;
@@ -211,4 +216,15 @@ export interface EmailTemplate {
   name: string;
   subject: string;
   body: string; // HTML content
+}
+
+export interface LogEntry {
+  id: string;
+  timestamp: string;
+  actorId: string;
+  actorName: string;
+  action: string;
+  targetType?: string;
+  targetId?: string;
+  details: string;
 }

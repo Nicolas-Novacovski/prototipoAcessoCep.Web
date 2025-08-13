@@ -1,5 +1,6 @@
 
 
+
 import React, { useEffect, useState, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Application, AnalysisResult, Grade, UserRole, Document, ValidationStatus, ApplicationStatus, EditalModalities, AppealStatus } from '../../types';
@@ -108,6 +109,23 @@ const AnalysisView = () => {
         if (age > 11) return 'A idade do candidato está acima da prevista em edital (10-11 anos).';
         return null;
     }, [application]);
+    
+    const isFormDisabled = useMemo(() => {
+        if (!application || isReanalyzing) {
+            return false;
+        }
+        // Allow re-analysis if status is EM_ANALISE or DOCUMENTACAO_INCOMPLETA
+        const lockedStatuses = [
+            ApplicationStatus.ANALISE_CONCLUIDA,
+            ApplicationStatus.AGUARDANDO_PARECER_COMISSAO,
+            ApplicationStatus.CLASSIFICADO_PRELIMINAR,
+            ApplicationStatus.CLASSIFICADO_FINAL,
+            ApplicationStatus.VAGA_ACEITA,
+            ApplicationStatus.VAGA_RECUSADA,
+            ApplicationStatus.ANALISE_INDEFERIDA,
+        ];
+        return lockedStatuses.includes(application.status);
+    }, [application, isReanalyzing]);
 
   useEffect(() => {
     if (id) {
@@ -343,8 +361,6 @@ const AnalysisView = () => {
         ? { title: 'Indeferir Documento', placeholder: 'Motivo do indeferimento...'} 
         : { title: 'Solicitar Reenvio de Documento', placeholder: 'Explique o que precisa ser corrigido...'}
   ) : { title: '', placeholder: ''};
-
-  const isFormDisabled = !!application.analysis && !isReanalyzing;
 
   return (
     <>

@@ -208,23 +208,33 @@ const Home = () => {
                                                     <p><span className="font-semibold text-slate-800 dark:text-slate-100">Vagas:</span> {edital.vacancyDetails.reduce((sum, v) => sum + v.count, 0)}</p>
                                                     <p><span className="font-semibold text-slate-800 dark:text-slate-100">Inscrições:</span> {new Date(edital.inscriptionStart).toLocaleDateString('pt-BR')} a {new Date(edital.inscriptionEnd).toLocaleDateString('pt-BR')}</p>
                                                 </div>
-                                                <div className="mt-6">
-                                                    {activeCalls.length > 0 ? (
+                                                <div className={`mt-6 ${edital.editalPdfUrl ? 'flex items-center gap-2' : ''}`}>
+                                                    {edital.editalPdfUrl && (
                                                         <button 
-                                                            onClick={() => openCallsModal(activeCalls)}
-                                                            className="w-full bg-blue-600 hover:bg-blue-700 text-white py-2 rounded-lg font-bold transition-colors"
+                                                            onClick={() => window.open(edital.editalPdfUrl, '_blank')}
+                                                            className="w-full bg-slate-200 hover:bg-slate-300 text-slate-800 dark:bg-slate-700 dark:text-slate-200 dark:hover:bg-slate-600 py-2 rounded-lg font-bold transition-colors"
                                                         >
-                                                            Ver Chamadas Complementares
-                                                        </button>
-                                                    ) : isOpen ? (
-                                                         <button onClick={() => navigate('/login')} className="w-full bg-cep-primary hover:bg-cep-secondary text-white py-2 rounded-lg font-bold transition-colors">
-                                                            Inscrever-se
-                                                         </button>
-                                                    ) : (
-                                                        <button className="w-full bg-slate-200 text-slate-500 dark:bg-slate-700 dark:text-slate-400 py-2 rounded-lg font-bold cursor-not-allowed" disabled>
-                                                            Ver detalhes
+                                                            Ver Edital (PDF)
                                                         </button>
                                                     )}
+                                                    <div className='w-full'>
+                                                        {activeCalls.length > 0 ? (
+                                                            <button 
+                                                                onClick={() => openCallsModal(activeCalls)}
+                                                                className="w-full bg-blue-600 hover:bg-blue-700 text-white py-2 rounded-lg font-bold transition-colors"
+                                                            >
+                                                                Ver Chamadas Complementares
+                                                            </button>
+                                                        ) : isOpen ? (
+                                                            <button onClick={() => navigate('/login')} className="w-full bg-cep-primary hover:bg-cep-secondary text-white py-2 rounded-lg font-bold transition-colors">
+                                                                Inscrever-se
+                                                            </button>
+                                                        ) : (
+                                                            <button className="w-full bg-slate-200 text-slate-500 dark:bg-slate-700 dark:text-slate-400 py-2 rounded-lg font-bold cursor-not-allowed" disabled>
+                                                                Ver detalhes
+                                                            </button>
+                                                        )}
+                                                    </div>
                                                 </div>
                                             </div>
                                         )

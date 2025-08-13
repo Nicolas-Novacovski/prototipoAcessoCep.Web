@@ -1,98 +1,114 @@
-import React, { useEffect, useState } from 'react';
+
+
+
+import React, { useEffect, useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Application, ApplicationStatus } from '../../types';
 import { api } from '../../services/mockApi';
-import Card, { CardContent, CardHeader, CardTitle } from '../../components/ui/Card';
+import Card, { CardContent } from '../../components/ui/Card';
 import Spinner from '../../components/ui/Spinner';
-import { StatusBadge } from '../../components/ui/Badge';
+import { IconUserCheck, IconAlertTriangle, IconCircleCheck, IconUsers } from '../../constants';
 import Button from '../../components/ui/Button';
+
+
+const StatCard = ({ title, value, icon, variant = 'default' }: { title: string, value: string | number, icon: React.ReactNode, variant?: 'default' | 'warning' | 'info' | 'success' }) => {
+    const variantClasses = {
+        default: 'bg-cep-primary text-white',
+        warning: 'bg-yellow-500 text-white',
+        info: 'bg-blue-500 text-white',
+        success: 'bg-teal-500 text-white',
+    };
+    return (
+        <Card>
+            <CardContent className="flex items-center justify-between">
+                <div>
+                    <p className="text-sm font-medium text-gray-500 dark:text-gray-400 truncate">{title}</p>
+                    <p className="mt-1 text-3xl font-semibold text-cep-text dark:text-white">{value}</p>
+                </div>
+                <div className={`flex-shrink-0 h-12 w-12 flex items-center justify-center rounded-md ${variantClasses[variant]}`}>
+                    {icon}
+                </div>
+            </CardContent>
+        </Card>
+    );
+};
+
 
 const AnalystDashboard = () => {
   const [applications, setApplications] = useState<Application[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [filterStatus, setFilterStatus] = useState<ApplicationStatus | 'all'>('all');
   const navigate = useNavigate();
 
   useEffect(() => {
-    api.getApplicationsForAnalyst()
+    // Fetch all applications for a complete overview
+    api.getAllApplications()
       .then(setApplications)
       .finally(() => setIsLoading(false));
   }, []);
+
+  const stats = useMemo(() => {
+    if (!applications) return { total: 0, emAnalise: 0, docIncompleta: 0, deferidas: 0, emRecurso: 0 };
+    return {
+      total: applications.length,
+      emAnalise: applications.filter(a => a.status === ApplicationStatus.EM_ANALISE).length,
+      docIncompleta: applications.filter(a => a.status === ApplicationStatus.DOCUMENTACAO_INCOMPLETA).length,
+      deferidas: applications.filter(a => a.status === ApplicationStatus.ANALISE_CONCLUIDA).length,
+      emRecurso: applications.filter(a => a.status === ApplicationStatus.EM_RECURSO).length,
+    };
+  }, [applications]);
 
   if (isLoading) {
     return <div className="flex justify-center items-center h-full"><Spinner /></div>;
   }
   
-  const filteredApplications = applications.filter(app => {
-    if (filterStatus === 'all') return true;
-    return app.status === filterStatus;
-  });
-
-  const filterOptions: { label: string, status: ApplicationStatus | 'all' }[] = [
-      { label: 'Todas', status: 'all'},
-      { label: 'Em Análise', status: ApplicationStatus.EM_ANALISE },
-      { label: 'Doc. Incompleta', status: ApplicationStatus.DOCUMENTACAO_INCOMPLETA },
-      { label: 'Deferidos', status: ApplicationStatus.ANALISE_CONCLUIDA },
-      { label: 'Em Recurso', status: ApplicationStatus.EM_RECURSO },
-  ]
-
   return (
     <div className="space-y-6">
-      <h1 className="text-3xl font-bold text-cep-text dark:text-white">Painel de Análise</h1>
+      <h1 className="text-3xl font-bold text-cep-text dark:text-white">Painel do Analista</h1>
+      
+       <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-5">
+        <StatCard 
+            title="Total de Inscrições" 
+            value={stats.total} 
+            icon={<IconUsers className="h-6 w-6"/>}
+            variant="info"
+        />
+        <StatCard 
+            title="Em Análise" 
+            value={stats.emAnalise} 
+            icon={<IconUserCheck className="h-6 w-6"/>}
+        />
+        <StatCard 
+            title="Doc. Incompleta" 
+            value={stats.docIncompleta} 
+            icon={<IconAlertTriangle className="h-6 w-6"/>}
+            variant="warning"
+        />
+         <StatCard 
+            title="Análises Deferidas" 
+            value={stats.deferidas} 
+            icon={<IconCircleCheck className="h-6 w-6"/>}
+            variant="success"
+        />
+         <StatCard 
+            title="Em Recurso" 
+            value={stats.emRecurso} 
+            icon={<IconAlertTriangle className="h-6 w-6"/>}
+            variant="warning"
+        />
+      </div>
+
       <Card>
-        <CardHeader>
-            <div className='flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4'>
-                <CardTitle>Inscrições Pendentes de Análise</CardTitle>
-                <div className="flex items-center space-x-2 bg-gray-100 dark:bg-slate-700 p-1 rounded-lg">
-                    {filterOptions.map(opt => (
-                        <Button 
-                            key={opt.status}
-                            onClick={() => setFilterStatus(opt.status)}
-                            className={`px-3 py-1.5 text-xs transition-colors duration-200 rounded-md ${
-                                filterStatus === opt.status 
-                                ? 'bg-white text-cep-primary shadow dark:bg-slate-600 dark:text-white' 
-                                : 'bg-transparent text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-slate-600/50'
-                            }`}
-                        >
-                            {opt.label}
-                        </Button>
-                    ))}
-                </div>
-            </div>
-        </CardHeader>
-        <CardContent>
-          {filteredApplications.length > 0 ? (
-            <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-200 dark:divide-slate-700">
-                <thead className="bg-gray-50 dark:bg-slate-700/50">
-                  <tr>
-                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Protocolo</th>
-                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Candidato</th>
-                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Edital</th>
-                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Status</th>
-                    <th scope="col" className="relative px-6 py-3"><span className="sr-only">Analisar</span></th>
-                  </tr>
-                </thead>
-                <tbody className="bg-white dark:bg-slate-800 divide-y divide-gray-200 dark:divide-slate-700">
-                  {filteredApplications.map(app => (
-                    <tr key={app.id}>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-cep-text dark:text-white">{app.protocol}</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">{app.student.name}</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">{app.edital.modality}</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400"><StatusBadge status={app.status}/></td>
-                      <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                        <Button onClick={() => navigate(`/analise/${app.id}`)}>
-                          Analisar
-                        </Button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          ) : (
-            <p className="text-center text-gray-500 dark:text-gray-400 py-8">Nenhuma inscrição encontrada para o filtro selecionado.</p>
-          )}
+        <CardContent className="text-center py-16">
+          <h2 className="text-2xl font-semibold text-cep-text dark:text-white">Bem-vindo(a) à sua central de análises.</h2>
+          <p className="mt-2 max-w-xl mx-auto text-gray-500 dark:text-gray-400">
+            Utilize os cartões acima para um resumo rápido da sua carga de trabalho ou
+            acesse a "Fila de Análise" no menu lateral para ver todas as inscrições pendentes.
+          </p>
+          <div className="mt-6">
+            <Button onClick={() => navigate('/analise')}>
+                Acessar Fila de Análise
+            </Button>
+          </div>
         </CardContent>
       </Card>
     </div>

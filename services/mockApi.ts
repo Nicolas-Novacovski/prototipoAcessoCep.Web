@@ -1,6 +1,6 @@
 
 
-import { User, UserRole, Application, ApplicationStatus, Edital, EditalModalities, Student, Document, AnalysisResult, EditalFormData, Appeal, ValidationStatus, VacancyType, VacancyShift, ComplementaryCall, EmailTemplate, CommissionAnalysis, AppealStatus, UserPermissions } from '../types';
+import { User, UserRole, Application, ApplicationStatus, Edital, EditalModalities, Student, Document, AnalysisResult, EditalFormData, Appeal, ValidationStatus, VacancyType, VacancyShift, ComplementaryCall, EmailTemplate, CommissionAnalysis, AppealStatus, UserPermissions, LogEntry } from '../types';
 
 // --- MOCK DATABASE ---
 
@@ -9,19 +9,21 @@ let users: User[] = [
     id: '1', name: 'Admin SEED', email: 'admin.seed@email.com', cpf: '11111111111', role: UserRole.ADMIN_SEED, phone: '41911111111',
     permissions: { 
       manage_editais: true, manage_chamadas: true, manage_analises: true, manage_casos_especiais: true, 
-      view_classificacao: true, manage_usuarios: true, view_relatorios: true, manage_email_templates: true, manage_config: true 
-    }
+      view_classificacao: true, manage_usuarios: true, view_relatorios: true, manage_email_templates: true, manage_config: true, view_audit_logs: true
+    },
+    isActive: true,
   },
   { 
     id: '2', name: 'Admin CEP', email: 'admin.cep@email.com', cpf: '22222222222', role: UserRole.ADMIN_CEP, phone: '41922222222',
     permissions: {
       manage_editais: true, manage_chamadas: true, manage_analises: true, manage_casos_especiais: true,
-      view_classificacao: true, manage_usuarios: true, view_relatorios: true, manage_email_templates: true,
-    }
+      view_classificacao: true, manage_usuarios: true, view_relatorios: true, manage_email_templates: true, view_audit_logs: true
+    },
+    isActive: true,
   },
-  { id: '3', name: 'Ana Lúcia (Analista)', email: 'analista@email.com', cpf: '33333333333', role: UserRole.ANALISTA, phone: '41933333333' },
-  { id: '4', name: 'Carlos (Responsável)', email: 'responsavel@email.com', cpf: '44444444444', role: UserRole.RESPONSAVEL, phone: '41944444444' },
-  { id: '5', name: 'Beatriz (Responsável)', email: 'responsavel2@email.com', cpf: '55555555555', role: UserRole.RESPONSAVEL, phone: '' },
+  { id: '3', name: 'Ana Lúcia (Analista)', email: 'analista@email.com', cpf: '33333333333', role: UserRole.ANALISTA, phone: '41933333333', isActive: true },
+  { id: '4', name: 'Carlos (Responsável)', email: 'responsavel@email.com', cpf: '44444444444', role: UserRole.RESPONSAVEL, phone: '41944444444', isActive: true },
+  { id: '5', name: 'Beatriz (Responsável)', email: 'responsavel2@email.com', cpf: '55555555555', role: UserRole.RESPONSAVEL, phone: '', isActive: true },
 ];
 
 let students: Student[] = [
@@ -70,12 +72,17 @@ let editais: Edital[] = [
       appealStartDate: '2025-12-06',
       appealEndDate: '2025-12-08',
       resultDate: '2025-12-10', 
+      vacancyAcceptanceStartDate: new Date(new Date().setDate(today.getDate() + 3)).toISOString(),
       vacancyAcceptanceDate: new Date(new Date().setDate(today.getDate() + 5)).toISOString(), // 5 days from now
       customRequirements: [
         { id: 'cr1', label: 'Candidato concluiu o 5º ano do Ensino Fundamental.' },
         { id: 'cr2', label: 'Reside na região metropolitana de Curitiba.' },
       ],
+      additionalDocuments: [
+        { id: 'ad1', label: 'Declaração de Vacinação' }
+      ],
       isActive: true,
+      editalPdfUrl: 'https://raw.githubusercontent.com/mozilla/pdf.js-sample-files/master/helloworld.pdf',
     },
     { 
       id: 'e2', 
@@ -94,9 +101,12 @@ let editais: Edital[] = [
       appealStartDate: '2025-12-06',
       appealEndDate: '2025-12-08',
       resultDate: '2025-12-10', 
+      vacancyAcceptanceStartDate: '2025-12-11',
       vacancyAcceptanceDate: '2025-12-15', 
       customRequirements: [],
+      additionalDocuments: [],
       isActive: true,
+      editalPdfUrl: 'https://raw.githubusercontent.com/mozilla/pdf.js-sample-files/master/tracemonkey.pdf',
     },
     { 
       id: 'e3', 
@@ -114,13 +124,16 @@ let editais: Edital[] = [
       preliminaryResultDate: '2025-10-05',
       appealStartDate: '2025-10-06',
       appealEndDate: '2025-10-08',
-      resultDate: '2025-10-10', 
+      resultDate: '2025-10-10',
+      vacancyAcceptanceStartDate: '2025-10-11',
       vacancyAcceptanceDate: '2025-10-15', 
       customRequirements: [
         { id: 'cr2', label: 'Certificado de Conclusão do Ensino Médio' },
         { id: 'cr3', label: 'Carteira de Trabalho (página de identificação)' },
       ],
+      additionalDocuments: [],
       isActive: false, // Inactive example
+      editalPdfUrl: 'https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf',
     },
 ];
 
@@ -363,50 +376,30 @@ Equipe do Colégio Estadual do Paraná (CEP)`,
     },
 ];
 
+let logs: LogEntry[] = [];
+
 const simulateDelay = (ms: number) => new Promise(res => setTimeout(res, ms));
 
-const renderEmailHtml = (plainText: string): string => {
-    const bodyWithBreaks = plainText
-        .replace(/&/g, "&amp;")
-        .replace(/</g, "&lt;")
-        .replace(/>/g, "&gt;")
-        .replace(/\n/g, '<br />');
-
-    return `
-<!DOCTYPE html>
-<html lang="pt-br">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <style>
-        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol'; line-height: 1.6; color: #333; margin: 0; padding: 0; background-color: #f4f4f4; }
-        .wrapper { width: 100%; padding: 20px 0; }
-        .container { width: 100%; max-width: 600px; margin: 0 auto; background-color: #ffffff; padding: 30px; border-radius: 8px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); border: 1px solid #ddd; }
-        .header { text-align: center; border-bottom: 1px solid #eee; padding-bottom: 20px; margin-bottom: 20px; }
-        .header h1 { color: #0D2635; margin: 0; font-size: 24px; }
-        .content { font-size: 16px; white-space: pre-wrap; }
-        .footer { text-align: center; margin-top: 30px; padding-top: 20px; border-top: 1px solid #eee; font-size: 12px; color: #888; }
-    </style>
-</head>
-<body>
-    <div class="wrapper">
-        <div class="container">
-            <div class="header">
-                <h1>Colégio Estadual do Paraná</h1>
-            </div>
-            <div class="content">
-                ${bodyWithBreaks}
-            </div>
-            <div class="footer">
-                <p>Este é um e-mail automático. Por favor, não responda.</p>
-                <p>&copy; ${new Date().getFullYear()} Sistema Acesso CEP</p>
-            </div>
-        </div>
-    </div>
-</body>
-</html>`;
+const addLog = (
+  actorId: string,
+  actorName: string,
+  action: string,
+  details: string,
+  targetType?: string,
+  targetId?: string
+) => {
+  const newLog: LogEntry = {
+    id: `log-${Date.now()}-${Math.random()}`,
+    timestamp: new Date().toISOString(),
+    actorId,
+    actorName,
+    action,
+    details,
+    targetType,
+    targetId,
+  };
+  logs.unshift(newLog);
 };
-
 
 // --- API FUNCTIONS ---
 
@@ -417,6 +410,10 @@ export const api = {
     if (!user) {
         throw new Error("Usuário não encontrado.");
     }
+    if (!user.isActive) {
+        throw new Error("Este usuário está desativado. Contate o administrador.");
+    }
+    addLog(user.id, user.name, 'LOGIN', 'Usuário realizou login com sucesso.');
     return user;
   },
 
@@ -464,23 +461,21 @@ export const api = {
 
     const totalScore = analysis.grades.reduce((acc, grade) => acc + (grade.score || 0), 0);
     
-    applications[appIndex] = {
-        ...applications[appIndex],
-        analysis,
-        documents: updatedDocs,
-        status: newStatus,
-        finalScore: (newStatus === ApplicationStatus.ANALISE_CONCLUIDA || newStatus === ApplicationStatus.AGUARDANDO_PARECER_COMISSAO) ? totalScore : applications[appIndex].finalScore,
-    };
+    const app = applications[appIndex];
+    app.analysis = analysis;
+    app.documents = updatedDocs;
+    app.status = newStatus;
+    app.finalScore = (newStatus === ApplicationStatus.ANALISE_CONCLUIDA || newStatus === ApplicationStatus.AGUARDANDO_PARECER_COMISSAO) ? totalScore : app.finalScore;
     
-    // Also update the specialNeedsDocument if it exists to reflect validation changes
-    if (applications[appIndex].specialNeedsDocument) {
-        const updatedLaudo = updatedDocs.find(d => d.id === applications[appIndex].specialNeedsDocument!.id);
+    if (app.specialNeedsDocument) {
+        const updatedLaudo = updatedDocs.find(d => d.id === app.specialNeedsDocument!.id);
         if (updatedLaudo) {
-            applications[appIndex].specialNeedsDocument = updatedLaudo;
+            app.specialNeedsDocument = updatedLaudo;
         }
     }
-
-    return applications[appIndex];
+    
+    addLog(analysis.analystId, analysis.analystName, 'SUBMIT_ANALYSIS', `Análise submetida para protocolo ${app.protocol}. Novo status: ${newStatus}.`, 'Application', appId);
+    return app;
   },
   
   getEditais: async (): Promise<Edital[]> => {
@@ -496,6 +491,7 @@ export const api = {
         isActive: true, // New editais are active by default
     };
     editais.push(newEdital);
+    addLog('system', 'Sistema', 'CREATE_EDITAL', `Edital "${newEdital.number}" criado.`, 'Edital', newEdital.id);
     return newEdital;
   },
 
@@ -504,6 +500,7 @@ export const api = {
     const editalIndex = editais.findIndex(e => e.id === editalId);
     if (editalIndex === -1) throw new Error("Edital não encontrado.");
     editais[editalIndex] = { ...editais[editalIndex], ...editalData };
+    addLog('system', 'Sistema', 'UPDATE_EDITAL', `Edital "${editais[editalIndex].number}" atualizado.`, 'Edital', editalId);
     return editais[editalIndex];
   },
 
@@ -511,9 +508,10 @@ export const api = {
     await simulateDelay(600);
     const editalIndex = editais.findIndex(e => e.id === editalId);
     if (editalIndex === -1) throw new Error("Edital não encontrado.");
+    const editalNumber = editais[editalIndex].number;
     editais.splice(editalIndex, 1);
-    // Cascade delete associated complementary calls
     complementaryCalls = complementaryCalls.filter(c => c.editalId !== editalId);
+    addLog('system', 'Sistema', 'DELETE_EDITAL', `Edital "${editalNumber}" excluído.`, 'Edital', editalId);
   },
 
   getComplementaryCalls: async (): Promise<ComplementaryCall[]> => {
@@ -528,6 +526,7 @@ export const api = {
         ...data,
     };
     complementaryCalls.push(newCall);
+    addLog('system', 'Sistema', 'CREATE_COMPLEMENTARY_CALL', `Chamada "${newCall.title}" criada para o edital ID ${newCall.editalId}.`, 'ComplementaryCall', newCall.id);
     return newCall;
   },
   
@@ -535,7 +534,9 @@ export const api = {
     await simulateDelay(600);
     const callIndex = complementaryCalls.findIndex(c => c.id === callId);
     if (callIndex === -1) throw new Error("Chamada complementar não encontrada.");
+    const callTitle = complementaryCalls[callIndex].title;
     complementaryCalls.splice(callIndex, 1);
+    addLog('system', 'Sistema', 'DELETE_COMPLEMENTARY_CALL', `Chamada "${callTitle}" excluída.`, 'ComplementaryCall', callId);
   },
 
   getStudentsByResponsible: async(cpf: string): Promise<Student[]> => {
@@ -558,9 +559,9 @@ export const api = {
         responsibleCpf,
         rg,
         uf,
-        // No CGM for private school students
     };
     students.push(newStudent);
+    addLog('system', 'Sistema', 'CREATE_STUDENT', `Estudante "${name}" criado.`, 'Student', newStudent.id);
     return newStudent;
   },
 
@@ -582,6 +583,7 @@ export const api = {
         siblingCgm: siblingCgm || undefined
     };
     applications.push(newApplication);
+    addLog(student.responsibleCpf, 'Responsável', 'CREATE_APPLICATION', `Inscrição criada para "${student.name}" no edital ${edital.number}.`, 'Application', newApplication.id);
     return newApplication;
   },
 
@@ -597,9 +599,11 @@ export const api = {
     }
     const newUser: User = {
       id: `u${Date.now()}`,
+      isActive: true,
       ...userData,
     };
     users.push(newUser);
+    addLog('system', 'Sistema', 'CREATE_USER', `Usuário "${newUser.name}" (${newUser.role}) criado.`, 'User', newUser.id);
     return newUser;
   },
 
@@ -610,6 +614,7 @@ export const api = {
     const existingPermissions = users[userIndex].permissions || {};
     const updatedPermissions = { ...existingPermissions, ...userData.permissions };
     users[userIndex] = { ...users[userIndex], ...userData, permissions: updatedPermissions };
+    addLog('system', 'Sistema', 'UPDATE_USER', `Usuário "${users[userIndex].name}" atualizado.`, 'User', userId);
     return users[userIndex];
   },
   
@@ -618,7 +623,9 @@ export const api = {
     const userIndex = users.findIndex(u => u.id === userId);
     if (userIndex === -1) throw new Error("Usuário não encontrado.");
     if (users[userIndex].role === UserRole.ADMIN_SEED) throw new Error("Não é possível excluir o usuário Admin SEED.");
+    const deletedUser = users[userIndex];
     users.splice(userIndex, 1);
+    addLog('system', 'Sistema', 'DELETE_USER', `Usuário "${deletedUser.name}" excluído.`, 'User', userId);
   },
   
   submitAppeal: async (appId: string, reason: string, justification: string, attachmentFile?: File): Promise<Application> => {
@@ -634,7 +641,7 @@ export const api = {
             id: newDocId,
             fileName: attachmentFile.name,
             fileType: attachmentFile.type,
-            fileUrl: URL.createObjectURL(attachmentFile), // MOCK
+            fileUrl: URL.createObjectURL(attachmentFile),
             validationStatus: ValidationStatus.VALIDO,
         };
         documents.push(attachment);
@@ -649,12 +656,11 @@ export const api = {
         attachment,
     };
     
-    applications[appIndex] = {
-        ...app,
-        appeal,
-        status: ApplicationStatus.EM_RECURSO,
-    };
-    return applications[appIndex];
+    app.appeal = appeal;
+    app.status = ApplicationStatus.EM_RECURSO;
+    
+    addLog(app.student.responsibleCpf, 'Responsável', 'SUBMIT_APPEAL', `Recurso submetido para protocolo ${app.protocol}.`, 'Application', app.id);
+    return app;
   },
 
   resolveAppeal: async (appId: string, decision: { status: AppealStatus.DEFERIDO | AppealStatus.INDEFERIDO, analystJustification: string }): Promise<Application> => {
@@ -676,7 +682,7 @@ export const api = {
         app.status = ApplicationStatus.CLASSIFICADO_PRELIMINAR; 
     }
     
-    applications[appIndex] = app;
+    addLog(app.analysis?.analystId || 'system', app.analysis?.analystName || 'Sistema', 'RESOLVE_APPEAL', `Recurso para protocolo ${app.protocol} foi ${decision.status}.`, 'Application', app.id);
     return app;
   },
 
@@ -685,11 +691,10 @@ export const api = {
     const appIndex = applications.findIndex(a => a.id === appId);
     if(appIndex === -1) throw new Error("Aplicação não encontrada");
     
-    applications[appIndex] = {
-        ...applications[appIndex],
-        status: ApplicationStatus.VAGA_ACEITA,
-    };
-    return applications[appIndex];
+    const app = applications[appIndex];
+    app.status = ApplicationStatus.VAGA_ACEITA;
+    addLog(app.student.responsibleCpf, 'Responsável', 'ACCEPT_VACANCY', `Vaga para protocolo ${app.protocol} foi aceita.`, 'Application', appId);
+    return app;
   },
 
   declineVacancy: async (appId: string): Promise<Application> => {
@@ -697,11 +702,10 @@ export const api = {
     const appIndex = applications.findIndex(a => a.id === appId);
     if(appIndex === -1) throw new Error("Aplicação não encontrada");
     
-    applications[appIndex] = {
-        ...applications[appIndex],
-        status: ApplicationStatus.VAGA_RECUSADA,
-    };
-    return applications[appIndex];
+    const app = applications[appIndex];
+    app.status = ApplicationStatus.VAGA_RECUSADA;
+    addLog(app.student.responsibleCpf, 'Responsável', 'DECLINE_VACANCY', `Vaga para protocolo ${app.protocol} foi recusada.`, 'Application', appId);
+    return app;
   },
   
   getEmailTemplates: async (): Promise<EmailTemplate[]> => {
@@ -714,6 +718,7 @@ export const api = {
     const templateIndex = emailTemplates.findIndex(t => t.id === templateId);
     if (templateIndex === -1) throw new Error('Template não encontrado');
     emailTemplates[templateIndex] = { ...emailTemplates[templateIndex], ...data };
+    addLog('system', 'Sistema', 'UPDATE_EMAIL_TEMPLATE', `Template "${emailTemplates[templateIndex].name}" atualizado.`, 'EmailTemplate', templateId);
     return emailTemplates[templateIndex];
   },
 
@@ -725,38 +730,25 @@ export const api = {
         return;
     }
 
-    let processedBody = template.body;
-    for (const key in context) {
-        if (key !== 'recipientEmail') {
-             processedBody = processedBody.replace(new RegExp(`{{${key}}}`, 'g'), context[key]);
-        }
-    }
-    
     const mainRecipient = context.recipientEmail;
-    let bccRecipient: string | null = null;
-    
-    if (templateName === 'Confirmação de Inscrição') {
-        bccRecipient = 'michel.delespinasse@escola.pr.gov.br';
-    }
+    const recipientUser = users.find(u => u.email === mainRecipient);
 
-    console.log('--- SENDING MOCK EMAIL ---');
-    console.log('Template:', template.name);
-    
-    if (mainRecipient) {
-        console.log(`To: ${mainRecipient}`);
-    } else {
-        console.warn('Warning: No main recipient (To:) specified for this email.');
-    }
-    
-    if (bccRecipient) {
-        console.log(`BCC: ${bccRecipient}`);
-    }
-    
-    console.log(`Subject: ${template.subject}`);
-    // To see the HTML, you can uncomment the log below
-    // const finalHtml = renderEmailHtml(processedBody);
-    // console.log(finalHtml);
-    console.log('--- EMAIL SENT (to all specified recipients) ---');
+    addLog(
+      context.actorId || 'system',
+      context.actorName || 'Sistema',
+      'SEND_EMAIL',
+      `E-mail "${templateName}" enviado para ${mainRecipient}.`,
+      'User',
+      recipientUser?.id
+    );
+
+    const bccRecipient = templateName === 'Confirmação de Inscrição' ? 'michel.delespinasse@escola.pr.gov.br' : null;
+
+    console.log(`--- SIMULATING EMAIL SEND ---
+Template: ${template.name}
+To: ${mainRecipient || 'N/A'}
+BCC: ${bccRecipient || 'N/A'}
+---------------------------`);
   },
   
   getSpecialEducationApplications: async (): Promise<Application[]> => {
@@ -769,37 +761,63 @@ export const api = {
       const appIndex = applications.findIndex(a => a.id === appId);
       if (appIndex === -1) throw new Error("Aplicação não encontrada");
 
+      const app = applications[appIndex];
       const commissionAnalysis: CommissionAnalysis = {
           ...decision,
           date: new Date().toISOString()
       };
       
-      applications[appIndex].commissionAnalysis = commissionAnalysis;
-      applications[appIndex].status = ApplicationStatus.ANALISE_CONCLUIDA;
+      app.commissionAnalysis = commissionAnalysis;
+      app.status = ApplicationStatus.ANALISE_CONCLUIDA;
 
-      if (!decision.isEligible && applications[appIndex].specialNeedsDocument) {
-          const docId = applications[appIndex].specialNeedsDocument!.id;
+      if (!decision.isEligible && app.specialNeedsDocument) {
+          const docId = app.specialNeedsDocument!.id;
           const reason = `Indeferido pela comissão: ${decision.justification}`;
           
-          // Update the main documents array
           const docIndex = documents.findIndex(d => d.id === docId);
           if (docIndex !== -1) {
               documents[docIndex].validationStatus = ValidationStatus.INVALIDO;
               documents[docIndex].invalidationReason = reason;
           }
           
-          // Update the document within the application object
-          const appDocIndex = applications[appIndex].documents.findIndex(d => d.id === docId);
+          const appDocIndex = app.documents.findIndex(d => d.id === docId);
           if(appDocIndex !== -1) {
-              applications[appIndex].documents[appDocIndex].validationStatus = ValidationStatus.INVALIDO;
-              applications[appIndex].documents[appDocIndex].invalidationReason = reason;
+              app.documents[appDocIndex].validationStatus = ValidationStatus.INVALIDO;
+              app.documents[appDocIndex].invalidationReason = reason;
           }
           
-          applications[appIndex].specialNeedsDocument!.validationStatus = ValidationStatus.INVALIDO;
-          applications[appIndex].specialNeedsDocument!.invalidationReason = reason;
+          app.specialNeedsDocument!.validationStatus = ValidationStatus.INVALIDO;
+          app.specialNeedsDocument!.invalidationReason = reason;
       }
-
-      return applications[appIndex];
+      addLog(decision.commissionMemberId, decision.commissionMemberName, 'SUBMIT_COMMISSION_DECISION', `Decisão da comissão para protocolo ${app.protocol} foi ${decision.isEligible ? 'Elegível' : 'Inelegível'}.`, 'Application', appId);
+      return app;
   },
 
+  getLogs: async (filters?: { userId?: string, text?: string }): Promise<LogEntry[]> => {
+      await simulateDelay(500);
+      if (!filters) {
+          return [...logs];
+      }
+
+      let filteredLogs = [...logs];
+
+      if (filters.userId && filters.userId !== 'all') {
+          filteredLogs = filteredLogs.filter(log =>
+              log.actorId === filters.userId ||
+              log.targetId === filters.userId
+          );
+      }
+      
+      if (filters.text) {
+          const searchText = filters.text.toLowerCase();
+          filteredLogs = filteredLogs.filter(log =>
+              log.actorName.toLowerCase().includes(searchText) ||
+              log.action.toLowerCase().replace(/_/g, ' ').includes(searchText) ||
+              log.details.toLowerCase().includes(searchText) ||
+              log.targetId?.toLowerCase().includes(searchText)
+          );
+      }
+
+      return filteredLogs;
+  },
 };

@@ -4,7 +4,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
 import { useToast, ToastType } from '../../hooks/useToast';
-import { Student, Edital, ApplicationStatus, ValidationStatus, EditalModalities, Document, Address, User, Application } from '../../types';
+import { Student, Edital, ApplicationStatus, ValidationStatus, EditalModalities, Document, Address, User, Application, CustomRequirement } from '../../types';
 import { api } from '../../services/mockApi';
 import Card, { CardContent, CardHeader, CardTitle } from '../../components/ui/Card';
 import Button from '../../components/ui/Button';
@@ -207,7 +207,6 @@ const NewApplicationForm = () => {
   const allDocTypes = useMemo(() => {
     let docs: { id: string; label: string; required: boolean; multiple: boolean }[] = [];
 
-    // Private school specific documents
     if (originFlow === 'PRIVATE') {
       docs.push(
         { id: 'rg_frente', label: 'RG (Frente)', required: true, multiple: false },
@@ -215,7 +214,6 @@ const NewApplicationForm = () => {
       );
     }
 
-    // Common documents for both flows
     const commonDocs = [
       { id: 'certidao', label: 'Certidão de nascimento', required: true, multiple: false },
       { id: 'residencia', label: 'Comprovante de residência', required: originFlow === 'PRIVATE', multiple: false },
@@ -225,14 +223,12 @@ const NewApplicationForm = () => {
     
     docs.push(...commonDocs);
 
-    // Special needs document
     if (hasSpecialNeeds) {
         docs.push({ id: 'laudo', label: 'Laudo médico (se aplicável)', required: true, multiple: false });
     }
     
-    // Custom requirements from edital
-    if (selectedEdital?.customRequirements) {
-        const customDocs = selectedEdital.customRequirements.map(req => ({
+    if (selectedEdital?.additionalDocuments) {
+        const customDocs = selectedEdital.additionalDocuments.map((req: CustomRequirement) => ({
             id: req.id,
             label: req.label,
             required: true,
@@ -436,6 +432,8 @@ const NewApplicationForm = () => {
 
       // Send notification email using the new template system
       api.sendEmail('Confirmação de Inscrição', {
+        actorId: user.id,
+        actorName: user.name,
         recipientEmail: contactEmail,
         studentName: finalStudent.name,
         protocol: finalApplication.protocol,

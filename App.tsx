@@ -1,7 +1,6 @@
 
 
 
-
 import React from 'react';
 import { HashRouter, Routes, Route, Navigate, Outlet } from 'react-router-dom';
 import { AuthProvider, useAuth } from './hooks/useAuth';
@@ -26,6 +25,9 @@ import { ThemeProvider } from './hooks/useTheme';
 import RankingView from './views/admin/RankingView';
 import ManageEmailTemplates from './views/admin/ManageEmailTemplates';
 import ManageSpecialCases from './views/admin/ManageSpecialCases';
+import AuditLogs from './views/admin/AuditLogs';
+import AnalystReports from './views/analyst/AnalystReports';
+import AnalysisQueue from './views/analyst/AnalysisQueue';
 
 const ProtectedRoute = ({ allowedRoles }: { allowedRoles?: UserRole[] }) => {
     const { isAuthenticated, user } = useAuth();
@@ -55,6 +57,12 @@ const AppRoutes = () => {
                     <Route path="/inscricao/nova" element={<NewApplicationForm />} />
                     <Route path="/inscricao/:id" element={<ApplicationDetail />} />
 
+                    {/* Analyst Routes */}
+                    <Route element={<ProtectedRoute allowedRoles={[UserRole.ANALISTA]} />}>
+                        <Route path="/analise" element={<AnalysisQueue />} /> 
+                        <Route path="/analise/relatorios" element={<AnalystReports />} />
+                    </Route>
+                    
                     {/* Analyst & Admin Routes */}
                     <Route element={<ProtectedRoute allowedRoles={[UserRole.ANALISTA, UserRole.ADMIN_CEP, UserRole.ADMIN_SEED]} />}>
                       <Route path="/analise/:id" element={<AnalysisView />} />
@@ -69,10 +77,11 @@ const AppRoutes = () => {
                         <Route path="/admin/usuarios" element={<ManageUsers />} />
                         <Route path="/admin/relatorios" element={<Reports />} />
                         <Route path="/admin/email-templates" element={<ManageEmailTemplates />} />
+                        <Route path="/admin/logs" element={<AuditLogs />} />
                     </Route>
 
-                    {/* CEP Admin Only Route */}
-                    <Route element={<ProtectedRoute allowedRoles={[UserRole.ADMIN_CEP]} />}>
+                    {/* CEP & SEED Admin Route for Special Cases */}
+                    <Route element={<ProtectedRoute allowedRoles={[UserRole.ADMIN_CEP, UserRole.ADMIN_SEED]} />}>
                       <Route path="/admin/casos-especiais" element={<ManageSpecialCases />} />
                     </Route>
 

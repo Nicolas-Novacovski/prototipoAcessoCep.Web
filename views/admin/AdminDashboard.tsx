@@ -5,7 +5,7 @@ import { Application, Edital } from '../../types';
 import { api } from '../../services/mockApi';
 import Card, { CardContent, CardTitle } from '../../components/ui/Card';
 import Spinner from '../../components/ui/Spinner';
-import { IconFileText, IconUserCheck, IconUsers, IconBarChart } from '../../constants';
+import { IconFileText, IconUserCheck, IconUsers, IconBarChart, IconTrendingUp, IconListDetails } from '../../constants';
 
 const StatCard = ({ title, value, icon }: { title: string, value: string | number, icon: React.ReactNode }) => (
     <Card>
@@ -20,6 +20,13 @@ const StatCard = ({ title, value, icon }: { title: string, value: string | numbe
         </CardContent>
     </Card>
 )
+
+const QuickActionButton = ({ onClick, icon, label }: { onClick: () => void; icon: React.ReactNode; label: string; }) => (
+    <button onClick={onClick} className="flex flex-col items-center justify-center p-4 bg-gray-50 dark:bg-slate-700/50 hover:bg-gray-100 dark:hover:bg-slate-700 rounded-lg transition-colors">
+        {icon}
+        <span className="mt-2 text-sm font-medium">{label}</span>
+    </button>
+);
 
 const AdminDashboard = () => {
   const [applications, setApplications] = useState<Application[]>([]);
@@ -46,6 +53,15 @@ const AdminDashboard = () => {
       activeEditais: editais.length,
   }
 
+    const quickActions = [
+      { onClick: () => navigate('/admin/editais'), icon: <IconFileText className="h-8 w-8 text-cep-primary" />, label: 'Gerenciar Editais' },
+      { onClick: () => navigate('/admin/usuarios'), icon: <IconUsers className="h-8 w-8 text-cep-primary" />, label: 'Gerenciar Usuários' },
+      { onClick: () => navigate('/admin/analises'), icon: <IconUserCheck className="h-8 w-8 text-cep-primary" />, label: 'Acompanhar Análises' },
+      { onClick: () => navigate('/classificacao'), icon: <IconTrendingUp className="h-8 w-8 text-cep-primary" />, label: 'Classificação' },
+      { onClick: () => navigate('/admin/relatorios'), icon: <IconBarChart className="h-8 w-8 text-cep-primary" />, label: 'Ver Relatórios' },
+      { onClick: () => navigate('/admin/logs'), icon: <IconListDetails className="h-8 w-8 text-cep-primary" />, label: 'Logs de Auditoria' },
+  ];
+
   return (
     <div className="space-y-6">
       <h1 className="text-3xl font-bold text-cep-text dark:text-white">Painel Administrativo</h1>
@@ -60,23 +76,10 @@ const AdminDashboard = () => {
         <Card>
             <CardContent>
                 <CardTitle>Ações Rápidas</CardTitle>
-                <div className="mt-4 grid grid-cols-2 gap-4">
-                    <button onClick={() => navigate('/admin/editais')} className="flex flex-col items-center justify-center p-4 bg-gray-50 dark:bg-slate-700/50 hover:bg-gray-100 dark:hover:bg-slate-700 rounded-lg transition-colors">
-                        <IconFileText className="h-8 w-8 text-cep-primary" />
-                        <span className="mt-2 text-sm font-medium">Gerenciar Editais</span>
-                    </button>
-                    <button onClick={() => navigate('/admin/usuarios')} className="flex flex-col items-center justify-center p-4 bg-gray-50 dark:bg-slate-700/50 hover:bg-gray-100 dark:hover:bg-slate-700 rounded-lg transition-colors">
-                        <IconUsers className="h-8 w-8 text-cep-primary" />
-                        <span className="mt-2 text-sm font-medium">Gerenciar Usuários</span>
-                    </button>
-                    <button onClick={() => navigate('/admin/analises')} className="flex flex-col items-center justify-center p-4 bg-gray-50 dark:bg-slate-700/50 hover:bg-gray-100 dark:hover:bg-slate-700 rounded-lg transition-colors">
-                        <IconUserCheck className="h-8 w-8 text-cep-primary" />
-                        <span className="mt-2 text-sm font-medium">Acompanhar Análises</span>
-                    </button>
-                    <button onClick={() => navigate('/admin/relatorios')} className="flex flex-col items-center justify-center p-4 bg-gray-50 dark:bg-slate-700/50 hover:bg-gray-100 dark:hover:bg-slate-700 rounded-lg transition-colors">
-                        <IconBarChart className="h-8 w-8 text-cep-primary" />
-                        <span className="mt-2 text-sm font-medium">Ver Relatórios</span>
-                    </button>
+                <div className="mt-4 grid grid-cols-2 lg:grid-cols-3 gap-4">
+                    {quickActions.map(action => (
+                        <QuickActionButton key={action.label} {...action} />
+                    ))}
                 </div>
             </CardContent>
         </Card>
