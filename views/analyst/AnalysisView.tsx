@@ -1,6 +1,5 @@
 
 
-
 import React, { useEffect, useState, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Application, AnalysisResult, Grade, UserRole, Document, ValidationStatus, ApplicationStatus, EditalModalities, AppealStatus } from '../../types';
@@ -11,7 +10,7 @@ import Spinner from '../../components/ui/Spinner';
 import Card, { CardContent, CardHeader, CardTitle } from '../../components/ui/Card';
 import Button from '../../components/ui/Button';
 import { StatusBadge, ValidationStatusBadge } from '../../components/ui/Badge';
-import { IconAlertTriangle, IconFileText, IconInfo } from '../../constants';
+import { IconAlertTriangle, IconFileText, IconInfo, IconDownload, IconBookOpen } from '../../constants';
 import PdfViewer from '../../components/ui/PdfViewer';
 import Modal from '../../components/ui/Modal';
 
@@ -65,6 +64,40 @@ const ReasonModal = ({
     );
 };
 
+const GuidelinesModal = ({ isOpen, onClose }: { isOpen: boolean, onClose: () => void }) => {
+    const guidelines = [
+        { situacao: 'Ainda não atingiu', sigla: 'AN', descricao: 'O/A estudante demonstra um desenvolvimento ainda elementar em relação ao critério avaliado. Há a necessidade de um plano de trabalho individual, com proposição de atividades diferenciadas e diversificadas a fim de que construa progressivamente seu processo de aprendizagem.' },
+        { situacao: 'Atingiu parcialmente', sigla: 'AP', descricao: 'O/A estudante ainda não domina com autonomia o critério de aprendizagem avaliado, necessitando de um acompanhamento pedagógico individualizado e constante. É necessária a elaboração de planejamentos em caráter de sucessivas retomadas e avanços, dando suporte para uma aprendizagem significativa e autônoma.' },
+        { situacao: 'Atingiu', sigla: 'AT', descricao: 'O/A estudante demonstra domínio do critério de aprendizagem avaliado, necessitando de atividades de aprofundamento para avançar ainda mais em seus conhecimentos.' },
+        { situacao: 'Supera o esperado em relação ao critério avaliado', sigla: 'SE', descricao: 'O/A estudante demonstra ir além do critério avaliado, portanto, é necessário proporcionar novos desafios a fim de manter seu interesse pela aprendizagem e auxiliá-lo/a no aprimoramento de seus conhecimentos.' }
+    ];
+
+    return (
+        <Modal isOpen={isOpen} onClose={onClose} title="Diretrizes de Avaliação" size="4xl">
+            <div className="overflow-x-auto">
+                <table className="min-w-full divide-y divide-gray-200 dark:divide-slate-700">
+                    <thead className="bg-gray-100 dark:bg-slate-700/50">
+                        <tr>
+                            <th className="px-4 py-3 text-left text-xs font-bold text-gray-600 dark:text-gray-300 uppercase">Situação do/a Estudante</th>
+                            <th className="px-4 py-3 text-left text-xs font-bold text-gray-600 dark:text-gray-300 uppercase">Sigla</th>
+                            <th className="px-4 py-3 text-left text-xs font-bold text-gray-600 dark:text-gray-300 uppercase">Descrição</th>
+                        </tr>
+                    </thead>
+                    <tbody className="bg-white dark:bg-slate-800 divide-y divide-gray-200 dark:divide-slate-700">
+                        {guidelines.map(item => (
+                            <tr key={item.sigla}>
+                                <td className="px-4 py-4 whitespace-nowrap text-sm font-medium text-cep-text dark:text-white">{item.situacao}</td>
+                                <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400 font-bold">{item.sigla}</td>
+                                <td className="px-4 py-4 text-sm text-gray-500 dark:text-gray-400 whitespace-normal">{item.descricao}</td>
+                            </tr>
+                        ))}
+                    </tbody>
+                </table>
+            </div>
+        </Modal>
+    );
+};
+
 
 const AnalysisView = () => {
   const { id } = useParams<{ id: string }>();
@@ -74,6 +107,7 @@ const AnalysisView = () => {
   const [application, setApplication] = useState<Application | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isSavingForLater, setIsSavingForLater] = useState(false);
   const [selectedDocUrl, setSelectedDocUrl] = useState<string | null>(null);
   const [documents, setDocuments] = useState<Document[]>([]);
   const [checklist, setChecklist] = useState<Record<string, boolean>>({});
@@ -81,6 +115,7 @@ const AnalysisView = () => {
   const [modalContext, setModalContext] = useState<{ docId: string; action: ValidationStatus.INVALIDO | ValidationStatus.SOLICITADO_REENVIO; } | null>(null);
   const [justification, setJustification] = useState('');
   const [showSaveButton, setShowSaveButton] = useState(false);
+  const [isGuidelinesModalOpen, setIsGuidelinesModalOpen] = useState(false);
 
   // State for appeal resolution
   const [isReanalyzing, setIsReanalyzing] = useState(false);
@@ -89,13 +124,7 @@ const AnalysisView = () => {
 
   const [formState, setFormState] = useState<{ observation: string; grades: Grade[] }>({
       observation: '',
-      grades: [
-          { year: 1, subject: 'Português', score: null }, { year: 1, subject: 'Matemática', score: null },
-          { year: 2, subject: 'Português', score: null }, { year: 2, subject: 'Matemática', score: null },
-          { year: 3, subject: 'Português', score: null }, { year: 3, subject: 'Matemática', score: null },
-          { year: 4, subject: 'Português', score: null }, { year: 4, subject: 'Matemática', score: null },
-          { year: 5, subject: 'Português', score: null }, { year: 5, subject: 'Matemática', score: null },
-      ],
+      grades: [],
   });
   
     const ageWarning = useMemo(() => {
@@ -133,9 +162,13 @@ const AnalysisView = () => {
         .then(app => {
             if (app) {
               setApplication(app);
-              const allDocs = [...app.documents];
-              if (app.specialNeedsDocument && !allDocs.some(d => d.id === app.specialNeedsDocument!.id)) {
-                  allDocs.push(app.specialNeedsDocument);
+              let allDocs = [...app.documents];
+              if (app.specialNeedsDocuments) {
+                 app.specialNeedsDocuments.forEach(laudo => {
+                     if (!allDocs.some(d => d.id === laudo.id)) {
+                         allDocs.push(laudo);
+                     }
+                 });
               }
               if (app.appeal?.attachment && !allDocs.some(d => d.id === app.appeal!.attachment!.id)) {
                   allDocs.push(app.appeal.attachment);
@@ -145,6 +178,7 @@ const AnalysisView = () => {
               if (allDocs.length > 0) {
                   setSelectedDocUrl(allDocs[0].fileUrl);
               }
+
               if(app.analysis) {
                   setFormState({ observation: app.analysis.observation, grades: app.analysis.grades })
                   setJustification(app.analysis.justification);
@@ -155,12 +189,25 @@ const AnalysisView = () => {
                     }, {} as Record<string, boolean>);
                     setChecklist(initialChecklistState);
                   }
-              } else if (app.edital.customRequirements) {
+              } else {
+                const gradeYears = app.edital.modality === EditalModalities.ENSINO_MEDIO || app.edital.modality === EditalModalities.TECNICO
+                    ? ['6º Ano', '7º Ano', '8º Ano', '9º Ano (Parcial)']
+                    : ['1º Ano', '2º Ano', '3º Ano', '4º Ano', '5º Ano'];
+                
+                const initialGrades = gradeYears.flatMap(year => ([
+                    { year, subject: 'Português' as const, score: null },
+                    { year, subject: 'Matemática' as const, score: null }
+                ]));
+
+                setFormState({ observation: '', grades: initialGrades });
+
+                if (app.edital.customRequirements) {
                   const initialChecklistState = app.edital.customRequirements.reduce((acc, item) => {
                       acc[item.id] = false;
                       return acc;
                   }, {} as Record<string, boolean>);
                   setChecklist(initialChecklistState);
+                }
               }
               if (app.appeal?.status === AppealStatus.DEFERIDO) {
                 setIsReanalyzing(true);
@@ -275,6 +322,38 @@ const AnalysisView = () => {
             setResolutionJustification('');
         }
     }
+  
+  const handleSaveForLater = async () => {
+    if (!id || !user || !application) return;
+    
+    setIsSavingForLater(true);
+    
+    const checklistData = Object.entries(checklist).map(([requirementId, checked]) => ({
+        requirementId,
+        checked,
+    }));
+
+    const partialAnalysis: Partial<AnalysisResult> = {
+        analystId: user.id,
+        analystName: user.name,
+        date: new Date().toISOString(),
+        grades: formState.grades,
+        observation: formState.observation,
+        justification,
+        checklist: checklistData,
+    };
+
+    try {
+        await api.sendApplicationToEndOfQueue(id, partialAnalysis, documents);
+        addToast('Análise salva. A inscrição foi movida para o fim da fila.', 'success');
+        navigate('/analise');
+    } catch (err) {
+        const message = err instanceof Error ? err.message : 'Erro ao salvar para depois.';
+        addToast(message, 'error');
+    } finally {
+        setIsSavingForLater(false);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -348,6 +427,17 @@ const AnalysisView = () => {
     }
   }
 
+  const gradesByYear = useMemo(() => {
+    return formState.grades.reduce((acc, grade) => {
+        if (!acc[grade.year]) {
+            acc[grade.year] = [];
+        }
+        acc[grade.year].push(grade);
+        return acc;
+    }, {} as Record<string, Grade[]>);
+  }, [formState.grades]);
+
+
   if (isLoading || !application) {
     return <div className="flex justify-center items-center h-screen"><Spinner /></div>;
   }
@@ -387,7 +477,13 @@ const AnalysisView = () => {
                      <p className="text-sm"><strong>Motivo:</strong> {application.appeal.reason}</p>
                      <p className="text-sm"><strong>Justificativa do Responsável:</strong><span className="block p-2 mt-1 bg-blue-50 dark:bg-slate-700/50 rounded">{application.appeal.justification}</span></p>
                      {application.appeal.attachment && (
-                        <p className="text-sm"><strong>Anexo:</strong> <button onClick={() => setSelectedDocUrl(application.appeal!.attachment!.fileUrl)} className="text-cep-primary hover:underline">{application.appeal.attachment.fileName}</button></p>
+                        <p className="text-sm flex items-center gap-2">
+                            <strong>Anexo:</strong> 
+                            <button onClick={() => setSelectedDocUrl(application.appeal!.attachment!.fileUrl)} className="text-cep-primary hover:underline">{application.appeal.attachment.fileName}</button>
+                            <a href={application.appeal.attachment.fileUrl} download={application.appeal.attachment.fileName} className="text-gray-400 hover:text-cep-primary" title="Baixar anexo">
+                                <IconDownload className="h-4 w-4" />
+                            </a>
+                        </p>
                      )}
                      <div className="flex justify-end gap-4 pt-4 border-t dark:border-slate-700">
                         <Button variant="danger" onClick={() => setIsResolutionModalOpen(true)}>Indeferir Recurso</Button>
@@ -401,7 +497,7 @@ const AnalysisView = () => {
           {/* Document List */}
           <div className="lg:col-span-3 space-y-3 lg:h-[80vh] lg:overflow-y-auto pr-2">
               {documents.map(doc => {
-                  const isLaudo = doc.id === application.specialNeedsDocument?.id;
+                  const isLaudo = application.specialNeedsDocuments?.some(laudo => laudo.id === doc.id) || false;
                   const isAppealAttachment = doc.id === application.appeal?.attachment?.id;
                   let displayName = doc.fileName;
                   if (isLaudo) displayName = `(LAUDO) ${doc.fileName}`;
@@ -409,20 +505,25 @@ const AnalysisView = () => {
 
                   return (
                       <div key={doc.id} className="p-3 bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700 shadow-sm">
-                          <button className="w-full flex items-center justify-between text-left rounded-md transition-colors p-1 -m-1" onClick={() => setSelectedDocUrl(doc.fileUrl)}>
-                              <div className="flex items-center min-w-0">
-                                  <IconFileText className="h-5 w-5 mr-2 text-cep-primary flex-shrink-0"/>
-                                  <span className="text-sm font-medium text-cep-text dark:text-slate-200 truncate" title={displayName}>{displayName}</span>
-                              </div>
-                              <ValidationStatusBadge status={doc.validationStatus} />
-                          </button>
-                          {!isAppealAttachment && (
-                            <div className="mt-3 pl-1 flex items-center justify-start gap-1 flex-wrap">
-                                <Button size="sm" className="text-xs" onClick={() => handleSetValidationStatus(doc.id, ValidationStatus.VALIDO)} disabled={isFormDisabled}>Deferir</Button>
-                                <Button size="sm" variant="secondary" className="text-xs" onClick={() => handleOpenReasonModal(doc.id, ValidationStatus.INVALIDO)} disabled={isFormDisabled}>Indeferir</Button>
-                                <Button size="sm" variant="secondary" className="text-xs" onClick={() => handleOpenReasonModal(doc.id, ValidationStatus.SOLICITADO_REENVIO)} disabled={isFormDisabled}>Reenvio</Button>
-                            </div>
-                          )}
+                          <div className='flex items-center justify-between'>
+                            <button className="flex items-center min-w-0 text-left" onClick={() => setSelectedDocUrl(doc.fileUrl)}>
+                                <IconFileText className="h-5 w-5 mr-2 text-cep-primary flex-shrink-0"/>
+                                <span className="text-sm font-medium text-cep-text dark:text-slate-200 truncate" title={displayName}>{displayName}</span>
+                            </button>
+                             <a href={doc.fileUrl} download={doc.fileName} className="p-1 text-slate-400 hover:text-cep-primary" title={`Baixar ${doc.fileName}`}>
+                                <IconDownload className="h-4 w-4" />
+                            </a>
+                          </div>
+                          <div className='flex items-center justify-between mt-2'>
+                            <ValidationStatusBadge status={doc.validationStatus} />
+                             {!isAppealAttachment && (
+                                <div className="flex items-center justify-start gap-1 flex-wrap">
+                                    <Button size="sm" className="text-xs" onClick={() => handleSetValidationStatus(doc.id, ValidationStatus.VALIDO)} disabled={isFormDisabled}>Deferir</Button>
+                                    <Button size="sm" variant="secondary" className="text-xs" onClick={() => handleOpenReasonModal(doc.id, ValidationStatus.INVALIDO)} disabled={isFormDisabled}>Indeferir</Button>
+                                    <Button size="sm" variant="secondary" className="text-xs" onClick={() => handleOpenReasonModal(doc.id, ValidationStatus.SOLICITADO_REENVIO)} disabled={isFormDisabled}>Reenvio</Button>
+                                </div>
+                            )}
+                          </div>
                            {(doc.validationStatus === ValidationStatus.INVALIDO || doc.validationStatus === ValidationStatus.SOLICITADO_REENVIO) && doc.invalidationReason && (
                               <div className="mt-2 text-xs text-slate-600 dark:text-slate-300 bg-slate-100 dark:bg-slate-700/50 p-2 rounded border border-slate-200 dark:border-slate-600">
                                   <strong>Motivo:</strong> {doc.invalidationReason}
@@ -493,20 +594,31 @@ const AnalysisView = () => {
                         )}
 
                         <div>
-                            <h3 className="text-lg font-medium text-cep-text dark:text-white">Conversão de Pareceres/Notas</h3>
+                            <div className="flex items-center gap-2">
+                                <h3 className="text-lg font-medium text-cep-text dark:text-white">Conversão de Pareceres/Notas</h3>
+                                <div className="group relative flex items-center">
+                                    <IconInfo className="h-5 w-5 text-slate-400 dark:text-slate-500 cursor-help" />
+                                    <div className="absolute bottom-full left-1/2 -translate-x-1/2 z-10 mb-2 w-64 p-3 bg-slate-700 dark:bg-slate-800 text-white dark:text-slate-200 text-xs font-normal rounded-lg shadow-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
+                                        Insira as notas na escala de 0 a 100, por exemplo: 87.
+                                    </div>
+                                </div>
+                                <button type="button" onClick={() => setIsGuidelinesModalOpen(true)} className="p-1 text-slate-400 hover:text-cep-primary dark:text-slate-500 dark:hover:text-cep-primary transition-colors" title="Ver diretrizes de avaliação">
+                                    <IconBookOpen className="h-5 w-5" />
+                                </button>
+                            </div>
                             <div className="space-y-4 mt-2">
-                                {[1, 2, 3, 4, 5].map(year => {
+                                {Object.entries(gradesByYear).map(([year, grades]) => {
+                                    const portuguesGrade = grades.find(g => g.subject === 'Português');
+                                    const matematicaGrade = grades.find(g => g.subject === 'Matemática');
                                     const portuguesIndex = formState.grades.findIndex(g => g.year === year && g.subject === 'Português');
                                     const matematicaIndex = formState.grades.findIndex(g => g.year === year && g.subject === 'Matemática');
-                                    const portuguesGrade = formState.grades[portuguesIndex];
-                                    const matematicaGrade = formState.grades[matematicaIndex];
                                     if (!portuguesGrade || !matematicaGrade) return null;
                                     return (
                                         <div key={year} className="p-3 border dark:border-slate-700 rounded-lg bg-slate-50/50 dark:bg-slate-700/30">
-                                          <p className="font-semibold text-sm mb-2 text-cep-text dark:text-slate-200">{year}º Ano</p>
+                                          <p className="font-semibold text-sm mb-2 text-cep-text dark:text-slate-200">{year}</p>
                                           <div className="grid grid-cols-2 gap-4">
-                                              <div><label className="block text-xs font-medium text-slate-600 dark:text-slate-400">Português</label><input type="number" step="0.1" min="0" max="10" value={portuguesGrade.score ?? ''} onChange={e => handleGradeChange(portuguesIndex, e.target.value)} disabled={isFormDisabled} className="mt-1 block w-full px-3 py-2 bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-md shadow-sm placeholder-slate-400 focus:outline-none focus:ring-cep-primary focus:border-cep-primary sm:text-sm disabled:bg-slate-100 dark:disabled:bg-slate-800"/></div>
-                                              <div><label className="block text-xs font-medium text-slate-600 dark:text-slate-400">Matemática</label><input type="number" step="0.1" min="0" max="10" value={matematicaGrade.score ?? ''} onChange={e => handleGradeChange(matematicaIndex, e.target.value)} disabled={isFormDisabled} className="mt-1 block w-full px-3 py-2 bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-md shadow-sm placeholder-slate-400 focus:outline-none focus:ring-cep-primary focus:border-cep-primary sm:text-sm disabled:bg-slate-100 dark:disabled:bg-slate-800"/></div>
+                                              <div><label className="block text-xs font-medium text-slate-600 dark:text-slate-400">Português</label><input type="number" step="1" min="0" max="100" value={portuguesGrade.score ?? ''} onChange={e => handleGradeChange(portuguesIndex, e.target.value)} disabled={isFormDisabled} className="mt-1 block w-full px-3 py-2 bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-md shadow-sm placeholder-slate-400 focus:outline-none focus:ring-cep-primary focus:border-cep-primary sm:text-sm disabled:bg-slate-100 dark:disabled:bg-slate-800"/></div>
+                                              <div><label className="block text-xs font-medium text-slate-600 dark:text-slate-400">Matemática</label><input type="number" step="1" min="0" max="100" value={matematicaGrade.score ?? ''} onChange={e => handleGradeChange(matematicaIndex, e.target.value)} disabled={isFormDisabled} className="mt-1 block w-full px-3 py-2 bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-md shadow-sm placeholder-slate-400 focus:outline-none focus:ring-cep-primary focus:border-cep-primary sm:text-sm disabled:bg-slate-100 dark:disabled:bg-slate-800"/></div>
                                           </div>
                                         </div>
                                     )
@@ -517,13 +629,33 @@ const AnalysisView = () => {
                         <div><label className="block text-sm font-medium text-cep-text dark:text-white">Justificativa / Parecer Descritivo (Gerado)</label><textarea rows={3} value={justification} readOnly className="mt-1 block w-full px-3 py-2 bg-slate-100 dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-md shadow-sm sm:text-sm" /></div>
                         <div><label className="block text-sm font-medium text-cep-text dark:text-white">Observações Internas</label><textarea rows={2} value={formState.observation} onChange={e => setFormState({ ...formState, observation: e.target.value })} disabled={isFormDisabled} className="mt-1 block w-full px-3 py-2 bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-md shadow-sm focus:outline-none focus:ring-cep-primary focus:border-cep-primary sm:text-sm disabled:bg-slate-100 dark:disabled:bg-slate-800" /></div>
 
-                        {showSaveButton && !isFormDisabled && (<div className="flex justify-end pt-4 border-t border-slate-200 dark:border-slate-700"><Button type="submit" isLoading={isSubmitting}>{isReanalyzing ? 'Salvar Reanálise' : 'Salvar Análise'}</Button></div>)}
+                        {showSaveButton && !isFormDisabled && (
+                          <div className="flex justify-end items-center gap-2 pt-4 border-t border-slate-200 dark:border-slate-700">
+                              <Button 
+                                  type="button" 
+                                  variant="secondary" 
+                                  onClick={handleSaveForLater} 
+                                  isLoading={isSavingForLater}
+                                  disabled={isSubmitting}
+                              >
+                                  Salvar para Fim de Fila
+                              </Button>
+                              <Button 
+                                  type="submit" 
+                                  isLoading={isSubmitting}
+                                  disabled={isSavingForLater}
+                              >
+                                  {isReanalyzing ? 'Salvar Reanálise' : 'Finalizar Análise'}
+                              </Button>
+                          </div>
+                        )}
                     </form>
                 </CardContent>
             </Card>
           </div>
       </div>
       <ReasonModal isOpen={!!modalContext} onClose={() => setModalContext(null)} onConfirm={handleConfirmReason} title={modalInfo.title} placeholder={modalInfo.placeholder}/>
+      <GuidelinesModal isOpen={isGuidelinesModalOpen} onClose={() => setIsGuidelinesModalOpen(false)} />
       <Modal isOpen={isResolutionModalOpen} onClose={() => setIsResolutionModalOpen(false)} title="Indeferir Recurso">
         <div className="space-y-4">
             <p className="text-sm text-gray-500 dark:text-gray-400">Forneça uma justificativa clara para o indeferimento do recurso. Esta informação será visível para o responsável.</p>

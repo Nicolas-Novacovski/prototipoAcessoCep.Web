@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import Card, { CardContent, CardHeader, CardTitle } from '../../components/ui/Card';
 import Button from '../../components/ui/Button';
@@ -15,9 +14,9 @@ const Reports = () => {
   const handleGenerateReport = async (reportType: string) => {
     setLoadingReport(reportType);
     try {
+      const apps = await api.getAllApplications();
       switch (reportType) {
         case 'Lista de Inscritos': {
-          const apps = await api.getAllApplications();
           const reportData = apps.map(app => ({
             Protocolo: app.protocol,
             Candidato: app.student.name,
@@ -30,23 +29,53 @@ const Reports = () => {
           downloadCSV(reportData, 'relatorio_inscritos.csv');
           break;
         }
-        case 'Lista de Classificados': {
-           const apps = await api.getAllApplications();
-           const classifiedApps = apps.filter(app => 
-                app.status === ApplicationStatus.CLASSIFICADO_FINAL || 
-                app.status === ApplicationStatus.VAGA_ACEITA
-            );
-           const reportData = classifiedApps.map(app => ({
+        case 'Lista Preliminar': {
+           const preliminaryApps = apps
+            .filter(app => app.status === ApplicationStatus.CLASSIFICADO_PRELIMINAR)
+            .sort((a, b) => (b.finalScore ?? 0) - (a.finalScore ?? 0));
+           const reportData = preliminaryApps.map((app, index) => ({
+            Classificacao: index + 1,
             Protocolo: app.protocol,
             Candidato: app.student.name,
-            PontuacaoFinal: app.finalScore,
-            Status: app.status
+            Pontuacao_Preliminar: app.finalScore?.toFixed(2),
            }));
-           downloadCSV(reportData, 'relatorio_classificados.csv');
+           downloadCSV(reportData, 'relatorio_classificados_preliminar.csv');
            break;
         }
+        case 'Lista Final de Classificados': {
+           const finalApps = apps
+            .filter(app => 
+                app.status === ApplicationStatus.CLASSIFICADO_FINAL || 
+                app.status === ApplicationStatus.VAGA_ACEITA
+            )
+            .sort((a, b) => (b.finalScore ?? 0) - (a.finalScore ?? 0));
+           const reportData = finalApps.map((app, index) => ({
+            Classificacao: index + 1,
+            Protocolo: app.protocol,
+            Candidato: app.student.name,
+            Pontuacao_Final: app.finalScore?.toFixed(2),
+            Status_Final: app.status,
+           }));
+           downloadCSV(reportData, 'relatorio_classificados_final.csv');
+           break;
+        }
+        case 'Lista de Recursos': {
+          const appsWithAppeals = apps.filter(app => !!app.appeal);
+          if (appsWithAppeals.length === 0) {
+              addToast('Nenhum recurso foi encontrado no sistema.', 'info');
+              return;
+          }
+          const reportData = appsWithAppeals.map(app => ({
+            Protocolo_Inscricao: app.protocol,
+            Candidato: app.student.name,
+            Data_Solicitacao: new Date(app.appeal!.date).toLocaleString('pt-BR'),
+            Status_Recurso: app.appeal?.status,
+            Motivo_Recurso: app.appeal?.reason,
+          }));
+          downloadCSV(reportData, 'relatorio_recursos.csv');
+          break;
+        }
         case 'Estatísticas Gerais': {
-           const apps = await api.getAllApplications();
            const stats = apps.reduce((acc, app) => {
                 acc[app.status] = (acc[app.status] || 0) + 1;
                 return acc;
@@ -59,11 +88,13 @@ const Reports = () => {
            break;
         }
         case 'Logs de Auditoria': {
-           // Mock data for audit logs
-           const reportData = [
-                {Timestamp: new Date().toISOString(), User: 'admin.cep@email.com', Action: 'CREATE_EDITAL', Details: 'Edital 005/2024 criado'},
-                {Timestamp: new Date().toISOString(), User: 'analista@email.com', Action: 'SUBMIT_ANALYSIS', Details: 'Análise do protocolo 20250001 concluída'},
-           ]
+           const logs = await api.getLogs();
+           const reportData = logs.map(log => ({
+             Timestamp: new Date(log.timestamp).toLocaleString('pt-BR'),
+             Autor: log.actorName,
+             Acao: log.action,
+             Detalhes: log.details,
+           }));
            downloadCSV(reportData, 'relatorio_auditoria.csv');
            break;
         }
@@ -97,10 +128,22 @@ const Reports = () => {
               isLoading={loadingReport === 'Lista de Inscritos'}
             />
             <ReportButton
-              title="Lista de Classificados"
-              description="Gera a lista final de candidatos classificados, incluindo pontuação final."
-              onClick={() => handleGenerateReport('Lista de Classificados')}
-               isLoading={loadingReport === 'Lista de Classificados'}
+              title="Lista Preliminar"
+              description="Gera a lista de classificação preliminar, antes do período de recursos."
+              onClick={() => handleGenerateReport('Lista Preliminar')}
+              isLoading={loadingReport === 'Lista Preliminar'}
+            />
+            <ReportButton
+              title="Lista Final de Classificados"
+              description="Gera a lista final de candidatos classificados, incluindo pontuação e status final."
+              onClick={() => handleGenerateReport('Lista Final de Classificados')}
+               isLoading={loadingReport === 'Lista Final de Classificados'}
+            />
+             <ReportButton
+              title="Lista de Recursos"
+              description="Exporta a lista de todos os recursos interpostos, incluindo seus status."
+              onClick={() => handleGenerateReport('Lista de Recursos')}
+              isLoading={loadingReport === 'Lista de Recursos'}
             />
             <ReportButton
               title="Estatísticas Gerais"
@@ -110,7 +153,7 @@ const Reports = () => {
             />
              <ReportButton
               title="Logs de Auditoria"
-              description="Exporta logs do sistema para fins de auditoria e segurança (dados de exemplo)."
+              description="Exporta logs do sistema para fins de auditoria e segurança."
               onClick={() => handleGenerateReport('Logs de Auditoria')}
                isLoading={loadingReport === 'Logs de Auditoria'}
             />

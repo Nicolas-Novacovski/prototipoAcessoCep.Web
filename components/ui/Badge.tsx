@@ -31,6 +31,7 @@ export const StatusBadge: React.FC<{ status: ApplicationStatus }> = ({ status })
     const statusColorMap: Record<ApplicationStatus, 'blue' | 'teal' | 'yellow' | 'red' | 'gray' | 'purple'> = {
         [ApplicationStatus.INSCRICAO_PENDENTE]: 'gray',
         [ApplicationStatus.EM_ANALISE]: 'blue',
+        [ApplicationStatus.FIM_DE_FILA]: 'blue',
         [ApplicationStatus.DOCUMENTACAO_INCOMPLETA]: 'yellow',
         [ApplicationStatus.ANALISE_CONCLUIDA]: 'teal',
         [ApplicationStatus.AGUARDANDO_PARECER_COMISSAO]: 'purple',

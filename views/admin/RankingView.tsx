@@ -1,6 +1,7 @@
 
+
 import React, { useState, useEffect, useMemo } from 'react';
-import { Application, Edital, ApplicationStatus, VacancyType, ValidationStatus } from '../../types';
+import { Application, Edital, ApplicationStatus, VacancyType } from '../../types';
 import { api } from '../../services/mockApi';
 import Card, { CardContent, CardHeader, CardTitle } from '../../components/ui/Card';
 import Spinner from '../../components/ui/Spinner';
@@ -70,6 +71,64 @@ const RankingView = () => {
             .finally(() => setIsLoading(false));
     }, []);
 
+    const rankingStatusInfo = useMemo(() => {
+        if (!selectedEditalId) return null;
+        const selectedEdital = editais.find(e => e.id === selectedEditalId);
+        if (!selectedEdital) return null;
+
+        const parseDate = (dateString: string) => {
+            const [y, m, d] = dateString.split('-').map(Number);
+            return new Date(y, m - 1, d);
+        };
+
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+
+        const preliminaryDate = parseDate(selectedEdital.preliminaryResultDate);
+        const finalDate = parseDate(selectedEdital.resultDate);
+
+        if (today < preliminaryDate) {
+            return {
+                status: 'UNAVAILABLE',
+                title: 'Classificação Indisponível',
+                message: `A classificação preliminar será divulgada em ${preliminaryDate.toLocaleDateString('pt-BR')}.`,
+                config: {
+                    bg: 'bg-slate-50 dark:bg-slate-800/40',
+                    border: 'border-slate-300 dark:border-slate-700/60',
+                    text: 'text-slate-700 dark:text-slate-300',
+                    titleText: 'text-slate-800 dark:text-slate-200',
+                    icon: <IconAlertTriangle className="h-8 w-8 text-slate-500 mr-4 flex-shrink-0" />
+                }
+            };
+        } else if (today >= preliminaryDate && today < finalDate) {
+            return {
+                status: 'PRELIMINARY',
+                title: 'Resultado Preliminar',
+                message: `O resultado final será divulgado em ${finalDate.toLocaleDateString('pt-BR')}.`,
+                config: {
+                    bg: 'bg-yellow-50 dark:bg-yellow-900/40',
+                    border: 'border-yellow-300 dark:border-yellow-700/60',
+                    text: 'text-yellow-700 dark:text-yellow-300',
+                    titleText: 'text-yellow-800 dark:text-yellow-200',
+                    icon: <IconAlertTriangle className="h-8 w-8 text-yellow-500 mr-4 flex-shrink-0" />
+                }
+            };
+        } else {
+            return {
+                status: 'FINAL',
+                title: 'Resultado Definitivo',
+                message: 'Este é o resultado definitivo do processo seletivo.',
+                config: {
+                    bg: 'bg-teal-50 dark:bg-teal-900/40',
+                    border: 'border-teal-300 dark:border-teal-700/60',
+                    text: 'text-teal-700 dark:text-teal-300',
+                    titleText: 'text-teal-800 dark:text-teal-200',
+                    icon: <IconShieldCheck className="h-8 w-8 text-teal-500 mr-4 flex-shrink-0" />
+                }
+            };
+        }
+    }, [selectedEditalId, editais]);
+
     const { generalList, specialNeedsList, generalVacancyCount, specialVacancyCount } = useMemo(() => {
         if (!selectedEditalId) {
             return { generalList: [], specialNeedsList: [], generalVacancyCount: 0, specialVacancyCount: 0 };
@@ -99,14 +158,9 @@ const RankingView = () => {
         const sortedApps = approvedApps.sort((a, b) => (b.finalScore ?? 0) - (a.finalScore ?? 0));
         
         const specialNeedsList = sortedApps.filter(app => {
-            if (!app.specialNeeds || !app.specialNeedsDocument) return false;
-            // Check the status of the laudo from the documents array
-            const laudo = app.documents.find(d => d.id === app.specialNeedsDocument?.id);
-            return laudo?.validationStatus === ValidationStatus.VALIDO;
+            return app.specialNeeds && app.commissionAnalysis?.isEligible === true;
         });
         
-        // General list includes everyone who was approved, including special needs candidates
-        // as they can also compete for general spots.
         const generalList = sortedApps;
 
         return { generalList, specialNeedsList, generalVacancyCount, specialVacancyCount };
@@ -138,31 +192,32 @@ const RankingView = () => {
                 <div className="flex justify-center items-center h-64"><Spinner /></div>
             ) : selectedEditalId ? (
                  <>
-                    <Card className="bg-blue-50 dark:bg-blue-900/40 border border-blue-300 dark:border-blue-700/60">
-                        <CardContent className="flex items-start md:items-center">
-                             <IconShieldCheck className="h-8 w-8 text-blue-500 mr-4 flex-shrink-0" />
-                             <div>
-                                <CardTitle className="text-blue-800 dark:text-blue-200 text-lg">Regras de Classificação</CardTitle>
-                                <ul className="text-blue-700 dark:text-blue-300 mt-1 text-sm list-disc list-inside space-y-1">
-                                    <li>Candidatos de Educação Especial (com laudo válido) concorrem primeiramente às vagas reservadas.</li>
-                                    <li>Todos os candidatos, incluindo os de Educação Especial, concorrem às vagas de Ampla Concorrência.</li>
-                                    <li>Esta é uma visualização preliminar e pode ser alterada após o período de recursos.</li>
-                                </ul>
-                             </div>
-                        </CardContent>
-                    </Card>
-                    <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
-                        <RankingList
-                            title="Educação Especial"
-                            applications={specialNeedsList}
-                            vacancyCount={specialVacancyCount}
-                        />
-                        <RankingList
-                            title="Ampla Concorrência"
-                            applications={generalList}
-                            vacancyCount={generalVacancyCount}
-                        />
-                    </div>
+                    {rankingStatusInfo && (
+                         <Card className={`${rankingStatusInfo.config.bg} ${rankingStatusInfo.config.border}`}>
+                            <CardContent className="flex items-start md:items-center">
+                                {rankingStatusInfo.config.icon}
+                                <div>
+                                    <CardTitle className={`${rankingStatusInfo.config.titleText} text-lg`}>{rankingStatusInfo.title}</CardTitle>
+                                    <p className={`${rankingStatusInfo.config.text} mt-1 text-sm`}>{rankingStatusInfo.message}</p>
+                                </div>
+                            </CardContent>
+                        </Card>
+                    )}
+                    
+                    {rankingStatusInfo?.status !== 'UNAVAILABLE' && (
+                        <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+                            <RankingList
+                                title="Educação Especial"
+                                applications={specialNeedsList}
+                                vacancyCount={specialVacancyCount}
+                            />
+                            <RankingList
+                                title="Ampla Concorrência"
+                                applications={generalList}
+                                vacancyCount={generalVacancyCount}
+                            />
+                        </div>
+                    )}
                 </>
             ) : (
                 <Card>

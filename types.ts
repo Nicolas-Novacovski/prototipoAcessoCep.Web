@@ -10,6 +10,7 @@ export enum UserRole {
 export enum ApplicationStatus {
   INSCRICAO_PENDENTE = 'Inscrição Pendente',
   EM_ANALISE = 'Em Análise',
+  FIM_DE_FILA = 'Fim de Fila',
   DOCUMENTACAO_INCOMPLETA = 'Documentação Incompleta',
   ANALISE_CONCLUIDA = 'Análise Concluída',
   AGUARDANDO_PARECER_COMISSAO = 'Aguardando Parecer da Comissão',
@@ -25,7 +26,7 @@ export enum ApplicationStatus {
 export enum EditalModalities {
     FUNDAMENTAL_6_ANO = '6º Ano EF',
     ENSINO_MEDIO = '1ª Série EM',
-    TECNICO = 'Técnico Subsequente',
+    TECNICO = 'Ensino Médio Profissional',
     CELEM = 'CELEM'
 }
 
@@ -138,7 +139,7 @@ export type EditalFormData = Omit<Edital, 'id'>;
 
 
 export interface Grade {
-    year: number;
+    year: string;
     subject: 'Português' | 'Matemática';
     score: number | null;
 }
@@ -198,7 +199,7 @@ export interface Application {
     status: ApplicationStatus;
     documents: Document[];
     specialNeeds: boolean;
-    specialNeedsDocument?: Document;
+    specialNeedsDocuments?: Document[];
     finalScore?: number;
     analysis?: AnalysisResult;
     commissionAnalysis?: CommissionAnalysis;

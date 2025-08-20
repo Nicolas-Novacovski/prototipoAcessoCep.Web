@@ -1,7 +1,4 @@
 
-
-
-
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../services/mockApi';
@@ -23,7 +20,7 @@ const FaqItem = ({ question, children }: { question: string, children: React.Rea
     </details>
 );
 
-const CountdownTimer = ({ endDate }: { endDate: string }) => {
+const CountdownTimer = ({ endDate, variant = 'hero' }: { endDate: string, variant?: 'hero' | 'card' }) => {
     const calculateTimeLeft = () => {
         const difference = +new Date(endDate) - +new Date();
         let timeLeft: { [key: string]: number } = {};
@@ -48,22 +45,38 @@ const CountdownTimer = ({ endDate }: { endDate: string }) => {
         return () => clearTimeout(timer);
     });
 
-    const timerComponents = Object.keys(timeLeft).map(interval => {
-        if (!timeLeft[interval] && timeLeft[interval] !== 0) {
-            return null;
+    const styles = {
+        hero: {
+            container: "flex space-x-2 md:space-x-4",
+            item: "flex flex-col items-center justify-center bg-black/30 backdrop-blur-sm p-3 rounded-lg w-20 h-20",
+            value: "text-3xl font-bold text-white",
+            label: "text-xs uppercase text-slate-300",
+            endMessage: "text-white text-lg font-semibold",
+        },
+        card: {
+            container: "flex space-x-2 justify-center",
+            item: "flex flex-col items-center justify-center bg-slate-100 dark:bg-slate-700/50 p-2 rounded-md w-14 h-14",
+            value: "text-xl font-bold text-cep-primary dark:text-cep-accent",
+            label: "text-xs uppercase text-slate-500 dark:text-slate-400",
+            endMessage: "text-sm text-slate-500 dark:text-slate-400 text-center font-medium",
         }
+    };
+    const currentStyle = styles[variant];
 
-        return (
-            <div key={interval} className="flex flex-col items-center justify-center bg-black/30 backdrop-blur-sm p-3 rounded-lg w-20 h-20">
-                <span className="text-3xl font-bold text-white">{String(timeLeft[interval]).padStart(2, '0')}</span>
-                <span className="text-xs uppercase text-slate-300">{interval}</span>
-            </div>
-        );
-    });
+    const timerComponents = Object.entries(timeLeft);
+
+    if (!timerComponents.length) {
+        return <p className={currentStyle.endMessage}>Inscrições encerradas.</p>;
+    }
 
     return (
-        <div className="flex space-x-2 md:space-x-4">
-            {timerComponents.length ? timerComponents : <span className="text-white">Inscrições encerradas.</span>}
+        <div className={currentStyle.container}>
+            {timerComponents.map(([interval, value]) => (
+                <div key={interval} className={currentStyle.item}>
+                    <span className={currentStyle.value}>{String(value).padStart(2, '0')}</span>
+                    <span className={currentStyle.label}>{interval}</span>
+                </div>
+            ))}
         </div>
     );
 };
@@ -74,7 +87,7 @@ const Home = () => {
     const [complementaryCalls, setComplementaryCalls] = useState<ComplementaryCall[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const navigate = useNavigate();
-    const [openEdital, setOpenEdital] = useState<Edital | null>(null);
+    const [openEditalForHero, setOpenEditalForHero] = useState<Edital | null>(null);
     const { theme, toggleTheme } = useTheme();
 
     const [isCallsModalOpen, setIsCallsModalOpen] = useState(false);
@@ -92,15 +105,11 @@ const Home = () => {
                     const end = new Date(edital.inscriptionEnd);
                     return now >= start && now <= end;
                 });
-                setOpenEdital(currentlyOpen || null);
+                setOpenEditalForHero(currentlyOpen || null);
             })
             .finally(() => setIsLoading(false));
     }, []);
     
-    const isEditalOpen = (edital: Edital) => {
-        return openEdital?.id === edital.id;
-    };
-
     const handleScrollToEditais = () => {
         const editaisSection = document.getElementById('editais');
         if (editaisSection) {
@@ -160,9 +169,9 @@ const Home = () => {
                            INSCREVA-SE AGORA
                            <IconArrowRight className="h-5 w-5" />
                         </button>
-                         {openEdital && (
+                         {openEditalForHero && (
                             <div className="mt-12">
-                                <CountdownTimer endDate={openEdital.inscriptionEnd} />
+                                <CountdownTimer endDate={openEditalForHero.inscriptionEnd} variant="hero" />
                             </div>
                          )}
                     </div>
@@ -185,8 +194,11 @@ const Home = () => {
                             editais.length > 0 ? (
                                 <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
                                     {editais.map(edital => {
-                                        const isOpen = isEditalOpen(edital);
                                         const now = new Date();
+                                        const start = new Date(edital.inscriptionStart);
+                                        const end = new Date(edital.inscriptionEnd);
+                                        const isOpen = now >= start && now <= end;
+                                        
                                         const activeCalls = complementaryCalls.filter(c => 
                                             c.editalId === edital.id && 
                                             now >= new Date(c.startDate)
@@ -208,6 +220,12 @@ const Home = () => {
                                                     <p><span className="font-semibold text-slate-800 dark:text-slate-100">Vagas:</span> {edital.vacancyDetails.reduce((sum, v) => sum + v.count, 0)}</p>
                                                     <p><span className="font-semibold text-slate-800 dark:text-slate-100">Inscrições:</span> {new Date(edital.inscriptionStart).toLocaleDateString('pt-BR')} a {new Date(edital.inscriptionEnd).toLocaleDateString('pt-BR')}</p>
                                                 </div>
+                                                {isOpen && (
+                                                    <div className="mt-4 pt-4 border-t border-slate-200 dark:border-slate-700">
+                                                        <p className="text-xs text-center text-slate-500 dark:text-slate-400 mb-2">Tempo restante para inscrição:</p>
+                                                        <CountdownTimer endDate={edital.inscriptionEnd} variant="card" />
+                                                    </div>
+                                                )}
                                                 <div className={`mt-6 ${edital.editalPdfUrl ? 'flex items-center gap-2' : ''}`}>
                                                     {edital.editalPdfUrl && (
                                                         <button 

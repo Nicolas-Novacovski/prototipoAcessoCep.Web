@@ -1,14 +1,13 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Application, Document, ApplicationStatus, ValidationStatus, AppealStatus } from '../../types';
+import { Application, Document, ApplicationStatus, ValidationStatus, AppealStatus, AnalysisResult } from '../../types';
 import { api } from '../../services/mockApi';
 import Spinner from '../../components/ui/Spinner';
 import Card, { CardContent, CardHeader, CardTitle } from '../../components/ui/Card';
 import Button from '../../components/ui/Button';
 import { StatusBadge, ValidationStatusBadge } from '../../components/ui/Badge';
 import Stepper from '../../components/ui/Stepper';
-import { IconFileText, IconAlertTriangle, IconCircleX, IconTrash, IconX } from '../../constants';
-import FileUpload from '../../components/ui/FileUpload';
+import { IconFileText, IconAlertTriangle, IconCircleX, IconTrash, IconX, IconDownload } from '../../constants';
 import Select from '../../components/ui/Select';
 import { useToast } from '../../hooks/useToast';
 import ConfirmationModal from '../../components/ui/ConfirmationModal';
@@ -189,9 +188,10 @@ const ApplicationDetail = () => {
   const [application, setApplication] = useState<Application | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [filesForCorrection, setFilesForCorrection] = useState<File[]>([]);
+  const [filesForCorrection, setFilesForCorrection] = useState<Record<string, File>>({});
   const [isDeclineModalOpen, setIsDeclineModalOpen] = useState(false);
   const [ranking, setRanking] = useState<number | null>(null);
+  const [isScoreDetailsOpen, setIsScoreDetailsOpen] = useState(false);
 
 
   const fetchApplication = React.useCallback(() => {
@@ -236,24 +236,72 @@ const ApplicationDetail = () => {
     }
   }, [application]);
 
+    const docsForCorrection = useMemo(() => {
+        if (!application) return [];
+        return application.documents.filter(doc => doc.validationStatus === ValidationStatus.SOLICITADO_REENVIO);
+    }, [application]);
+
+  const handleCorrectionFileChange = (docId: string, e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+        const file = e.target.files[0];
+        if (file.type !== 'application/pdf') {
+            addToast('Apenas arquivos PDF são permitidos.', 'error');
+            return;
+        }
+        if (file.size > 10 * 1024 * 1024) {
+            addToast(`Arquivo excede o tamanho de 10MB.`, 'error');
+            return;
+        }
+        setFilesForCorrection(prev => ({ ...prev, [docId]: file }));
+    }
+  };
+
+  const removeCorrectionFile = (docId: string) => {
+    setFilesForCorrection(prev => {
+        const newState = { ...prev };
+        delete newState[docId];
+        return newState;
+    });
+  };
+
   const handleCorrectionSubmit = async () => {
-    if(!id || !application || filesForCorrection.length === 0) return;
+    if (!id || !application) return;
+
+    if (Object.keys(filesForCorrection).length !== docsForCorrection.length) {
+        addToast('Por favor, anexe todos os documentos solicitados para correção.', 'error');
+        return;
+    }
+
     setIsSubmitting(true);
-    // This is a mock upload. In a real app, you'd upload files and get back URLs.
-    const newDocuments: Document[] = filesForCorrection.map((file, index) => ({
-        id: `doc-new-${Date.now()}-${index}`,
-        fileName: file.name,
-        fileType: file.type,
-        fileUrl: URL.createObjectURL(file), // Mock URL for display
-        validationStatus: ValidationStatus.PENDENTE
-    }));
+    
+    const newDocumentVersions: Record<string, Document> = {};
+    Object.entries(filesForCorrection).forEach(([docId, file]) => {
+        newDocumentVersions[docId] = {
+            id: docId,
+            fileName: file.name,
+            fileType: file.type,
+            fileUrl: URL.createObjectURL(file),
+            validationStatus: ValidationStatus.PENDENTE,
+            invalidationReason: undefined,
+        };
+    });
+
+    const updatedDocuments = application.documents.map(doc => 
+        newDocumentVersions[doc.id] || doc
+    );
+
+    const updatedSpecialNeedsDocuments = application.specialNeedsDocuments?.map(doc =>
+        newDocumentVersions[doc.id] || doc
+    );
 
     try {
         await api.updateApplication(id, {
-            documents: [...application.documents, ...newDocuments],
-            status: ApplicationStatus.EM_ANALISE // Change status back to analysis
+            documents: updatedDocuments,
+            specialNeedsDocuments: updatedSpecialNeedsDocuments,
+            status: ApplicationStatus.EM_ANALISE,
         });
         addToast('Documentos enviados com sucesso.', 'success');
+        setFilesForCorrection({});
         fetchApplication();
     } catch (err) {
         const message = err instanceof Error ? err.message : 'Erro ao enviar documentos.';
@@ -295,11 +343,10 @@ const ApplicationDetail = () => {
   }, [application]);
   
   const laudoInvalidadoAnalyst = useMemo(() => {
-    if (!application || !application.specialNeeds || !application.specialNeedsDocument) {
+    if (!application || !application.specialNeeds || !application.specialNeedsDocuments || application.specialNeedsDocuments.length === 0) {
         return false;
     }
-    // Check if invalidated by analyst, but not yet reviewed by commission
-    return application.specialNeedsDocument.validationStatus === ValidationStatus.INVALIDO && !application.commissionAnalysis;
+    return application.specialNeedsDocuments.some(d => d.validationStatus === ValidationStatus.INVALIDO) && !application.commissionAnalysis;
   }, [application]);
 
   if (isLoading || !application) {
@@ -307,8 +354,6 @@ const ApplicationDetail = () => {
   }
 
   const { student, edital, status, documents, analysis, appeal } = application;
-
-  const docsForCorrection = documents.filter(doc => doc.validationStatus === ValidationStatus.SOLICITADO_REENVIO);
 
   return (
     <div className="space-y-6">
@@ -350,19 +395,41 @@ const ApplicationDetail = () => {
                     <h3 className="font-semibold text-cep-text dark:text-white">Justificativa do Analista</h3>
                     <p className="text-sm text-gray-500 dark:text-gray-400 mt-2 p-4 bg-gray-50 dark:bg-slate-700/50 rounded-lg whitespace-pre-wrap">{analysis?.justification}</p>
                 </div>
-                <div>
+                <div className="space-y-4">
                     <h3 className="font-semibold text-cep-text dark:text-white">Documentos a serem reenviados:</h3>
-                    <ul className="list-disc list-inside mt-2 text-sm text-gray-600 dark:text-gray-400">
-                        {docsForCorrection.map(doc => <li key={doc.id}>{doc.fileName}</li>)}
-                    </ul>
+                    {docsForCorrection.map(doc => (
+                        <div key={doc.id} className="p-4 border dark:border-slate-700 rounded-lg bg-gray-50/50 dark:bg-slate-800/30">
+                            <h4 className="font-medium text-cep-text dark:text-slate-200">{doc.fileName}</h4>
+                            <p className="text-xs text-red-500 mt-1">Motivo: {doc.invalidationReason}</p>
+                            <div className="mt-2">
+                                {!filesForCorrection[doc.id] ? (
+                                    <input
+                                        type="file"
+                                        accept="application/pdf"
+                                        onChange={(e) => handleCorrectionFileChange(doc.id, e)}
+                                        className="block w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-cep-primary/10 file:text-cep-primary hover:file:bg-cep-primary/20"
+                                    />
+                                ) : (
+                                    <div className="flex items-center text-cep-text dark:text-slate-200 bg-white dark:bg-slate-700 p-2 rounded-md border dark:border-slate-600 text-sm">
+                                        <IconFileText className="h-5 w-5 mr-3 text-gray-500 dark:text-gray-400 flex-shrink-0" />
+                                        <span className="flex-1 truncate" title={filesForCorrection[doc.id].name}>{filesForCorrection[doc.id].name}</span>
+                                        <button
+                                            type="button"
+                                            onClick={() => removeCorrectionFile(doc.id)}
+                                            className="ml-4 p-1 text-gray-400 hover:text-red-600 rounded-full hover:bg-red-100 dark:hover:bg-red-900/50 transition-colors"
+                                            aria-label={`Remover ${filesForCorrection[doc.id].name}`}
+                                        >
+                                            <IconX className="h-4 w-4" />
+                                        </button>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    ))}
                 </div>
-                 <FileUpload
-                    onFilesSelect={setFilesForCorrection}
-                    requiredDocuments={docsForCorrection.map(doc => doc.fileName)}
-                />
                 <div className="text-right">
-                    <Button onClick={handleCorrectionSubmit} isLoading={isSubmitting} disabled={filesForCorrection.length === 0}>
-                        Enviar Correção
+                    <Button onClick={handleCorrectionSubmit} isLoading={isSubmitting} disabled={Object.keys(filesForCorrection).length !== docsForCorrection.length}>
+                        Enviar Correções
                     </Button>
                 </div>
             </CardContent>
@@ -390,6 +457,56 @@ const ApplicationDetail = () => {
                         )}
                     </div>
                     {ranking !== null && <p className="text-sm text-gray-500 dark:text-gray-400">Esta é sua classificação geral no edital. O período para interposição de recursos está aberto.</p>}
+                    
+                    {application.analysis && application.analysis.grades && (
+                        <div className="text-left border-t dark:border-slate-700 pt-4 mt-4">
+                            <button 
+                                onClick={() => setIsScoreDetailsOpen(!isScoreDetailsOpen)} 
+                                className="w-full text-left font-semibold text-cep-primary hover:underline flex justify-between items-center"
+                                aria-expanded={isScoreDetailsOpen}
+                            >
+                                <span>Ver detalhamento da pontuação</span>
+                                <span className={`transform transition-transform duration-200 ${isScoreDetailsOpen ? 'rotate-180' : ''}`}>▼</span>
+                            </button>
+                            {isScoreDetailsOpen && (
+                                <div className="mt-4 overflow-x-auto animate-fade-in-right">
+                                    {(() => { 
+                                        const gradesByYear: Record<string, { portugues: number | null, matematica: number | null }> = {};
+                                        application.analysis!.grades.forEach(grade => {
+                                            if (!gradesByYear[grade.year]) {
+                                                gradesByYear[grade.year] = { portugues: null, matematica: null };
+                                            }
+                                            if (grade.subject === 'Português') {
+                                                gradesByYear[grade.year].portugues = grade.score;
+                                            } else {
+                                                gradesByYear[grade.year].matematica = grade.score;
+                                            }
+                                        });
+                                        return (
+                                            <table className="min-w-full text-sm">
+                                                <thead className="bg-slate-50 dark:bg-slate-700/50">
+                                                    <tr>
+                                                        <th className="px-4 py-2 text-left font-medium text-slate-600 dark:text-slate-300">Ano</th>
+                                                        <th className="px-4 py-2 text-left font-medium text-slate-600 dark:text-slate-300">Português</th>
+                                                        <th className="px-4 py-2 text-left font-medium text-slate-600 dark:text-slate-300">Matemática</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody className="divide-y divide-slate-200 dark:divide-slate-700">
+                                                    {Object.entries(gradesByYear).map(([year, scores]) => (
+                                                        <tr key={year}>
+                                                            <td className="px-4 py-2 font-medium text-cep-text dark:text-slate-200">{year}</td>
+                                                            <td className="px-4 py-2 text-gray-600 dark:text-gray-300">{scores.portugues ?? 'N/A'}</td>
+                                                            <td className="px-4 py-2 text-gray-600 dark:text-gray-300">{scores.matematica ?? 'N/A'}</td>
+                                                        </tr>
+                                                    ))}
+                                                </tbody>
+                                            </table>
+                                        );
+                                    })()}
+                                </div>
+                            )}
+                        </div>
+                    )}
                 </CardContent>
             </Card>
             <AppealForm applicationId={application.id} onAppealSubmitted={fetchApplication} />
@@ -407,9 +524,14 @@ const ApplicationDetail = () => {
                 {appeal.attachment && (
                     <div>
                         <p className="text-sm font-semibold">Anexo:</p>
-                        <a href={appeal.attachment.fileUrl} target="_blank" rel="noopener noreferrer" className="text-cep-primary hover:underline flex items-center gap-2">
-                           <IconFileText className="h-4 w-4" /> {appeal.attachment.fileName}
-                        </a>
+                        <div className="flex items-center gap-2">
+                            <a href={appeal.attachment.fileUrl} target="_blank" rel="noopener noreferrer" className="text-cep-primary hover:underline flex items-center gap-2">
+                               <IconFileText className="h-4 w-4" /> {appeal.attachment.fileName}
+                            </a>
+                             <a href={appeal.attachment.fileUrl} download={appeal.attachment.fileName} className="text-gray-400 hover:text-cep-primary" title="Baixar anexo">
+                                <IconDownload className="h-4 w-4" />
+                            </a>
+                        </div>
                     </div>
                 )}
             </CardContent>
@@ -446,24 +568,21 @@ const ApplicationDetail = () => {
         <CardHeader><CardTitle>Documentos Enviados</CardTitle></CardHeader>
         <CardContent>
           <ul className="space-y-2">
-            {documents.map(doc => (
-              <li key={doc.id} className="flex items-center justify-between p-2 bg-gray-50 dark:bg-slate-700/50 rounded-lg">
-                <div className="flex items-center">
-                    <IconFileText className="h-5 w-5 mr-3 text-gray-400"/>
-                    <span>{doc.fileName}</span>
-                </div>
-                <ValidationStatusBadge status={doc.validationStatus} />
-              </li>
-            ))}
-             {application.specialNeedsDocument && !documents.some(d => d.id === application.specialNeedsDocument?.id) && (
-                 <li key={application.specialNeedsDocument.id} className="flex items-center justify-between p-2 bg-gray-50 dark:bg-slate-700/50 rounded-lg">
-                    <div className="flex items-center">
-                        <IconFileText className="h-5 w-5 mr-3 text-gray-400"/>
-                        <span>(LAUDO) {application.specialNeedsDocument.fileName}</span>
-                    </div>
-                    <ValidationStatusBadge status={application.specialNeedsDocument.validationStatus} />
-                 </li>
-            )}
+            {documents.map(doc => {
+              const isLaudo = application.specialNeedsDocuments?.some(laudo => laudo.id === doc.id);
+              return (
+                <li key={doc.id} className="flex items-center justify-between p-2 bg-gray-50 dark:bg-slate-700/50 rounded-lg">
+                  <div className="flex items-center min-w-0">
+                      <IconFileText className="h-5 w-5 mr-3 text-gray-400"/>
+                      <span className='truncate'>{isLaudo ? `(LAUDO) ${doc.fileName}` : doc.fileName}</span>
+                       <a href={doc.fileUrl} download={doc.fileName} className="ml-2 p-1 text-slate-400 hover:text-cep-primary" title={`Baixar ${doc.fileName}`}>
+                          <IconDownload className="h-4 w-4" />
+                      </a>
+                  </div>
+                  <ValidationStatusBadge status={doc.validationStatus} />
+                </li>
+              );
+            })}
           </ul>
         </CardContent>
       </Card>

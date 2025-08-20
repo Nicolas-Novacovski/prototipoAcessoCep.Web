@@ -1,5 +1,3 @@
-
-
 import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
@@ -138,7 +136,7 @@ const NewApplicationForm = () => {
   
   const [responsibleName, setResponsibleName] = useState(user?.name || '');
   const [responsibleCpf, setResponsibleCpf] = useState(user?.cpf || '');
-  const [contactEmail, setContactEmail] = useState(user?.email || '');
+  const [contactEmail, setContactEmail] = useState('');
   const [contactPhone, setContactPhone] = useState(user?.phone || '');
   
   const [isCepLoading, setIsCepLoading] = useState(false);
@@ -224,7 +222,7 @@ const NewApplicationForm = () => {
     docs.push(...commonDocs);
 
     if (hasSpecialNeeds) {
-        docs.push({ id: 'laudo', label: 'Laudo médico (se aplicável)', required: true, multiple: false });
+        docs.push({ id: 'laudo', label: 'Laudo(s) médico(s) (se aplicável)', required: true, multiple: true });
     }
     
     if (selectedEdital?.additionalDocuments) {
@@ -407,16 +405,29 @@ const NewApplicationForm = () => {
       }
 
       const newApplication = await api.createApplication(finalStudent.id, selectedEdital.id, hasSpecialNeeds, siblingCgm);
-      const filesToUpload = Object.values(docFiles).flat();
-      const documentsForApp: Document[] = filesToUpload.map((file, i) => ({
-        id: `d-new-${Date.now()}-${i}`,
-        fileName: file.name, fileType: file.type,
-        fileUrl: URL.createObjectURL(file), // MOCK
-        validationStatus: ValidationStatus.PENDENTE
-      }));
       
+      let allDocumentsForApp: Document[] = [];
+      let specialNeedsDocsForApp: Document[] = [];
+
+      Object.entries(docFiles).forEach(([docTypeId, files]) => {
+         const newDocs = files.map((file, i) => ({
+             id: `d-new-${docTypeId}-${Date.now()}-${i}`,
+             fileName: file.name,
+             fileType: file.type,
+             fileUrl: URL.createObjectURL(file), // MOCK
+             validationStatus: ValidationStatus.PENDENTE,
+         }));
+
+         allDocumentsForApp.push(...newDocs);
+
+         if (docTypeId === 'laudo') {
+             specialNeedsDocsForApp.push(...newDocs);
+         }
+      });
+
       const updatePayload: Partial<Application> = {
-        documents: documentsForApp,
+        documents: allDocumentsForApp,
+        specialNeedsDocuments: specialNeedsDocsForApp.length > 0 ? specialNeedsDocsForApp : undefined,
         status: ApplicationStatus.EM_ANALISE,
         address: originFlow === 'PRIVATE' ? address : undefined,
       };
@@ -591,7 +602,7 @@ const NewApplicationForm = () => {
                     maxLength={14}
                     required={originFlow === 'PRIVATE'}
                    />
-                  <Input id="contactEmail" label="E-mail do Responsável" type="email" value={contactEmail} onChange={e => setContactEmail(e.target.value)} required />
+                  <Input id="contactEmail" label="Digite o e-mail do responsável para contato" type="email" value={contactEmail} onChange={e => setContactEmail(e.target.value)} required placeholder="responsavel@email.com" />
                   <Input id="contactPhone" label="Telefone com DDD" type="tel" value={contactPhone} onChange={e => setContactPhone(e.target.value)} required placeholder="(XX) XXXXX-XXXX" />
                   <div className="flex justify-between mt-6 pt-4 border-t dark:border-slate-700"><Button onClick={handlePrevStep} variant='secondary'>Voltar</Button><Button type="submit">Confirmar e Continuar</Button></div>
                 </form>

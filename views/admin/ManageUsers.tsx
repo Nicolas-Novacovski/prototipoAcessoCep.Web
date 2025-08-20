@@ -1,9 +1,8 @@
 
-
-import React, { useState, useEffect } from 'react';
-import { User, UserRole, PermissionKey, UserPermissions } from '../../types';
+import React, { useState, useEffect, useMemo } from 'react';
+import { User, UserRole, PermissionKey, UserPermissions, Edital, Application } from '../../types';
 import { api } from '../../services/mockApi';
-import Card, { CardContent } from '../../components/ui/Card';
+import Card, { CardContent, CardHeader, CardTitle } from '../../components/ui/Card';
 import Button from '../../components/ui/Button';
 import Spinner from '../../components/ui/Spinner';
 import Modal from '../../components/ui/Modal';
@@ -36,6 +35,8 @@ const cepDelegablePermissions: PermissionKey[] = [
 
 const ManageUsers = () => {
   const [users, setUsers] = useState<User[]>([]);
+  const [editais, setEditais] = useState<Edital[]>([]);
+  const [applications, setApplications] = useState<Application[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isConfirmOpen, setIsConfirmOpen] = useState(false);
@@ -43,15 +44,55 @@ const ManageUsers = () => {
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const { addToast } = useToast();
   const { user: currentUser } = useAuth();
+  
+  const [searchTerm, setSearchTerm] = useState('');
+  const [selectedEditalId, setSelectedEditalId] = useState('all');
 
   const fetchUsers = () => {
     setIsLoading(true);
-    api.getUsers().then(setUsers).finally(() => setIsLoading(false));
+    Promise.all([
+      api.getUsers(),
+      api.getEditais(),
+      api.getAllApplications()
+    ]).then(([userData, editalData, appData]) => {
+      setUsers(userData);
+      setEditais(editalData);
+      setApplications(appData);
+    }).finally(() => setIsLoading(false));
   };
 
   useEffect(() => {
     fetchUsers();
   }, []);
+
+  const filteredUsers = useMemo(() => {
+    let filtered = [...users];
+
+    // Edital filter (applies only to 'Responsável')
+    if (selectedEditalId !== 'all') {
+        const responsibleCpfsInEdital = applications
+            .filter(app => app.edital.id === selectedEditalId)
+            .map(app => app.student.responsibleCpf);
+        
+        const uniqueCpfs = [...new Set(responsibleCpfsInEdital)];
+
+        filtered = filtered.filter(user => 
+            user.role !== UserRole.RESPONSAVEL || uniqueCpfs.includes(user.cpf)
+        );
+    }
+
+    // Search term filter
+    if (searchTerm.trim()) {
+        const lowercasedFilter = searchTerm.toLowerCase();
+        filtered = filtered.filter(user =>
+            user.name.toLowerCase().includes(lowercasedFilter) ||
+            user.email.toLowerCase().includes(lowercasedFilter) ||
+            user.cpf.includes(lowercasedFilter)
+        );
+    }
+    
+    return filtered;
+  }, [users, searchTerm, selectedEditalId, applications]);
 
   const openModalForNew = () => {
     setEditingUser(null);
@@ -134,8 +175,38 @@ const ManageUsers = () => {
         <Button onClick={openModalForNew}>Novo Usuário</Button>
       </div>
       <Card>
+        <CardHeader>
+           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+              <CardTitle>Todos os Usuários</CardTitle>
+              <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+                  <Select
+                      id="edital-filter"
+                      label=""
+                      value={selectedEditalId}
+                      onChange={(e) => setSelectedEditalId(e.target.value)}
+                      className="w-full sm:w-64"
+                  >
+                      <option value="all">Filtrar por Edital (Responsáveis)</option>
+                      {editais.map(edital => (
+                          <option key={edital.id} value={edital.id}>
+                              Edital {edital.number} - {edital.modality}
+                          </option>
+                      ))}
+                  </Select>
+                  <Input
+                      id="search-filter"
+                      label=""
+                      type="text"
+                      placeholder="Buscar por nome, email ou CPF..."
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                      className="w-full sm:w-64"
+                  />
+              </div>
+          </div>
+        </CardHeader>
         <CardContent>
-          {isLoading ? <Spinner /> : <UserTable users={users} onEdit={openModalForEdit} onDelete={openConfirmModal} onToggleActive={handleToggleActive} currentUser={currentUser} />}
+          {isLoading ? <Spinner /> : <UserTable users={filteredUsers} applications={applications} onEdit={openModalForEdit} onDelete={openConfirmModal} onToggleActive={handleToggleActive} currentUser={currentUser} />}
         </CardContent>
       </Card>
       {isModalOpen && (
@@ -158,7 +229,7 @@ const ManageUsers = () => {
   );
 };
 
-const UserTable = ({ users, onEdit, onDelete, onToggleActive, currentUser }: { users: User[]; onEdit: (user: User) => void; onDelete: (id: string) => void; onToggleActive: (user: User) => void; currentUser: User | null;}) => {
+const UserTable = ({ users, applications, onEdit, onDelete, onToggleActive, currentUser }: { users: User[]; applications: Application[]; onEdit: (user: User) => void; onDelete: (id: string) => void; onToggleActive: (user: User) => void; currentUser: User | null;}) => {
   return (
     <div className="overflow-x-auto">
       <table className="min-w-full divide-y divide-gray-200 dark:divide-slate-700">
@@ -168,12 +239,29 @@ const UserTable = ({ users, onEdit, onDelete, onToggleActive, currentUser }: { u
             <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Nome</th>
             <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Email</th>
             <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Perfil</th>
+            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Modalidade de Entrada</th>
             <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Ações</th>
           </tr>
         </thead>
         <tbody className="bg-white dark:bg-slate-800 divide-y divide-gray-200 dark:divide-slate-700">
           {users.map(user => {
             const canToggle = !(currentUser?.id === user.id || (currentUser?.role === UserRole.ADMIN_CEP && user.role === UserRole.ADMIN_SEED));
+            
+            const getUserModality = () => {
+              if (user.role !== UserRole.RESPONSAVEL) {
+                return 'N/A';
+              }
+              const userApps = applications.filter(app => app.student.responsibleCpf === user.cpf);
+              if (userApps.length === 0) {
+                return 'Nenhuma Inscrição';
+              }
+              const modalities = new Set(userApps.map(app => app.address ? 'Externo/Particular' : 'Rede Pública'));
+              if (modalities.size > 1) {
+                return 'Misto';
+              }
+              return Array.from(modalities)[0];
+            };
+
             return (
               <tr key={user.id} className={`${!user.isActive ? 'opacity-50' : ''}`}>
                  <td className="px-6 py-4 whitespace-nowrap">
@@ -196,6 +284,7 @@ const UserTable = ({ users, onEdit, onDelete, onToggleActive, currentUser }: { u
                 <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-cep-text dark:text-white">{user.name}</td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">{user.email}</td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">{user.role}</td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">{getUserModality()}</td>
                 <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium space-x-2">
                   <Button variant="secondary" onClick={() => onEdit(user)} className="p-2 h-auto">
                     <IconEdit className="h-4 w-4" />

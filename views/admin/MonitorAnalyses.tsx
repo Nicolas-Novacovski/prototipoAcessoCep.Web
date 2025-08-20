@@ -1,5 +1,5 @@
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Application } from '../../types';
 import { api } from '../../services/mockApi';
@@ -7,10 +7,12 @@ import Card, { CardContent, CardHeader, CardTitle } from '../../components/ui/Ca
 import Spinner from '../../components/ui/Spinner';
 import { StatusBadge } from '../../components/ui/Badge';
 import Button from '../../components/ui/Button';
+import Input from '../../components/ui/Input';
 
 const MonitorAnalyses = () => {
   const [applications, setApplications] = useState<Application[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [searchTerm, setSearchTerm] = useState('');
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -18,6 +20,18 @@ const MonitorAnalyses = () => {
       .then(setApplications)
       .finally(() => setIsLoading(false));
   }, []);
+
+  const filteredApplications = useMemo(() => {
+    if (!searchTerm.trim()) {
+      return applications;
+    }
+    const lowercasedFilter = searchTerm.toLowerCase();
+    return applications.filter(app =>
+      app.protocol.toLowerCase().includes(lowercasedFilter) ||
+      app.student.name.toLowerCase().includes(lowercasedFilter) ||
+      (app.analysis?.analystName || '').toLowerCase().includes(lowercasedFilter)
+    );
+  }, [applications, searchTerm]);
 
   if (isLoading) {
     return <div className="flex justify-center items-center h-full"><Spinner /></div>;
@@ -28,10 +42,21 @@ const MonitorAnalyses = () => {
       <h1 className="text-3xl font-bold text-cep-text dark:text-white">Acompanhar Análises</h1>
       <Card>
         <CardHeader>
-          <CardTitle>Todas as Inscrições</CardTitle>
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+            <CardTitle>Todas as Inscrições</CardTitle>
+            <Input
+              id="search-monitor"
+              label=""
+              type="text"
+              placeholder="Buscar por protocolo, candidato..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full sm:w-72"
+            />
+          </div>
         </CardHeader>
         <CardContent>
-          {applications.length > 0 ? (
+          {filteredApplications.length > 0 ? (
             <div className="overflow-x-auto">
               <table className="min-w-full divide-y divide-gray-200 dark:divide-slate-700">
                 <thead className="bg-gray-50 dark:bg-slate-700/50">
@@ -45,7 +70,7 @@ const MonitorAnalyses = () => {
                   </tr>
                 </thead>
                 <tbody className="bg-white dark:bg-slate-800 divide-y divide-gray-200 dark:divide-slate-700">
-                  {applications.map(app => (
+                  {filteredApplications.map(app => (
                     <tr key={app.id}>
                       <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-cep-text dark:text-white">{app.protocol}</td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">{app.student.name}</td>

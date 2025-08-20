@@ -66,14 +66,14 @@ let editais: Edital[] = [
       year: new Date().getFullYear(), 
       inscriptionStart: closedStart1.toISOString(),
       inscriptionEnd: closedEnd1.toISOString(),
-      analysisStart: '2025-11-26', 
-      analysisEnd: '2025-12-01', 
-      preliminaryResultDate: '2025-12-05',
-      appealStartDate: '2025-12-06',
-      appealEndDate: '2025-12-08',
-      resultDate: '2025-12-10', 
-      vacancyAcceptanceStartDate: new Date(new Date().setDate(today.getDate() + 3)).toISOString(),
-      vacancyAcceptanceDate: new Date(new Date().setDate(today.getDate() + 5)).toISOString(), // 5 days from now
+      analysisStart: new Date(new Date().setDate(today.getDate() - 15)).toISOString().split('T')[0],
+      analysisEnd: new Date(new Date().setDate(today.getDate() - 8)).toISOString().split('T')[0],
+      preliminaryResultDate: new Date(new Date().setDate(today.getDate() - 7)).toISOString().split('T')[0], // In the past
+      appealStartDate: new Date(new Date().setDate(today.getDate() - 6)).toISOString().split('T')[0],
+      appealEndDate: new Date(new Date().setDate(today.getDate() - 4)).toISOString().split('T')[0],
+      resultDate: new Date(new Date().setDate(today.getDate() + 3)).toISOString().split('T')[0], // In the future
+      vacancyAcceptanceStartDate: new Date(new Date().setDate(today.getDate() + 4)).toISOString(),
+      vacancyAcceptanceDate: new Date(new Date().setDate(today.getDate() + 8)).toISOString(),
       customRequirements: [
         { id: 'cr1', label: 'Candidato concluiu o 5º ano do Ensino Fundamental.' },
         { id: 'cr2', label: 'Reside na região metropolitana de Curitiba.' },
@@ -146,6 +146,7 @@ let documents: Document[] = [
     { id: 'd5', fileName: 'declaracao_aprovada_ana.pdf', fileType: 'application/pdf', fileUrl: 'https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf', validationStatus: ValidationStatus.VALIDO },
     { id: 'd6', fileName: 'laudo_valido_mariana.pdf', fileType: 'application/pdf', fileUrl: 'https://raw.githubusercontent.com/mozilla/pdf.js-sample-files/master/helloworld.pdf', validationStatus: ValidationStatus.VALIDO },
     { id: 'd7', fileName: 'laudo_invalido_sofia.pdf', fileType: 'application/pdf', fileUrl: 'https://raw.githubusercontent.com/mozilla/pdf.js-sample-files/master/tracemonkey.pdf', validationStatus: ValidationStatus.INVALIDO, invalidationReason: "Laudo médico vencido. É necessário um laudo emitido nos últimos 12 meses." },
+    { id: 'd8', fileName: 'laudo_complementar_mariana.pdf', fileType: 'application/pdf', fileUrl: 'https://raw.githubusercontent.com/mozilla/pdf.js-sample-files/master/tracemonkey.pdf', validationStatus: ValidationStatus.VALIDO },
 ]
 
 let applications: Application[] = [
@@ -176,7 +177,7 @@ let applications: Application[] = [
     status: ApplicationStatus.DOCUMENTACAO_INCOMPLETA,
     documents: [],
     specialNeeds: true,
-    specialNeedsDocument: documents[2],
+    specialNeedsDocuments: [documents[2]],
     submissionDate: '2025-10-26T14:30:00Z',
   },
   {
@@ -205,8 +206,23 @@ let applications: Application[] = [
     status: ApplicationStatus.CLASSIFICADO_PRELIMINAR,
     documents: [documents[0]],
     specialNeeds: false,
-    finalScore: 92,
+    finalScore: 91.75,
     submissionDate: '2025-10-28T11:00:00Z',
+    analysis: {
+        analystId: '3',
+        analystName: 'Ana Lúcia (Analista)',
+        date: new Date().toISOString(),
+        justification: 'Documentação aprovada em conformidade com o edital.',
+        observation: '',
+        grades: [
+            { year: '6º Ano', subject: 'Português', score: 90 }, { year: '6º Ano', subject: 'Matemática', score: 95 },
+            { year: '7º Ano', subject: 'Português', score: 92 }, { year: '7º Ano', subject: 'Matemática', score: 93 },
+            { year: '8º Ano', subject: 'Português', score: 91 }, { year: '8º Ano', subject: 'Matemática', score: 90 },
+            { year: '9º Ano (Parcial)', subject: 'Português', score: 94 }, { year: '9º Ano (Parcial)', subject: 'Matemática', score: 89 },
+        ],
+        isApproved: true,
+        checklist: []
+    }
   },
    {
     id: 'app5',
@@ -235,11 +251,11 @@ let applications: Application[] = [
         justification: 'Documentação aprovada em conformidade com o edital.',
         observation: '',
         grades: [
-            { year: 1, subject: 'Português', score: 9.5 }, { year: 1, subject: 'Matemática', score: 9.5 },
-            { year: 2, subject: 'Português', score: 9.5 }, { year: 2, subject: 'Matemática', score: 9.5 },
-            { year: 3, subject: 'Português', score: 9.5 }, { year: 3, subject: 'Matemática', score: 9.5 },
-            { year: 4, subject: 'Português', score: 9.5 }, { year: 4, subject: 'Matemática', score: 9.5 },
-            { year: 5, subject: 'Português', score: 9.5 }, { year: 5, subject: 'Matemática', score: 9.5 },
+            { year: '1º Ano', subject: 'Português', score: 95 }, { year: '1º Ano', subject: 'Matemática', score: 95 },
+            { year: '2º Ano', subject: 'Português', score: 95 }, { year: '2º Ano', subject: 'Matemática', score: 95 },
+            { year: '3º Ano', subject: 'Português', score: 95 }, { year: '3º Ano', subject: 'Matemática', score: 95 },
+            { year: '4º Ano', subject: 'Português', score: 95 }, { year: '4º Ano', subject: 'Matemática', score: 95 },
+            { year: '5º Ano', subject: 'Português', score: 95 }, { year: '5º Ano', subject: 'Matemática', score: 95 },
         ],
         isApproved: true,
         checklist: [
@@ -248,7 +264,6 @@ let applications: Application[] = [
         ]
     }
   },
-  // New applications for ranking and vacancy acceptance
   {
     id: 'app7',
     protocol: '20250007',
@@ -266,9 +281,9 @@ let applications: Application[] = [
     student: students[5], // Mariana Costa
     edital: editais[0],
     status: ApplicationStatus.AGUARDANDO_PARECER_COMISSAO,
-    documents: [documents[3], documents[4], documents[5]],
+    documents: [documents[3], documents[4], documents[5], documents[7]],
     specialNeeds: true,
-    specialNeedsDocument: documents[5],
+    specialNeedsDocuments: [documents[5], documents[7]],
     finalScore: 97,
     submissionDate: '2025-10-28T14:00:00Z',
     analysis: {
@@ -278,11 +293,11 @@ let applications: Application[] = [
         justification: 'Documentação formalmente correta. Laudo encaminhado para análise da comissão.',
         observation: '',
         grades: [
-             { year: 1, subject: 'Português', score: 9.8 }, { year: 1, subject: 'Matemática', score: 9.5 },
-            { year: 2, subject: 'Português', score: 9.6 }, { year: 2, subject: 'Matemática', score: 9.8 },
-            { year: 3, subject: 'Português', score: 9.7 }, { year: 3, subject: 'Matemática', score: 9.7 },
-            { year: 4, subject: 'Português', score: 9.9 }, { year: 4, subject: 'Matemática', score: 9.6 },
-            { year: 5, subject: 'Português', score: 9.8 }, { year: 5, subject: 'Matemática', score: 9.6 },
+            { year: '1º Ano', subject: 'Português', score: 97 }, { year: '1º Ano', subject: 'Matemática', score: 97 },
+            { year: '2º Ano', subject: 'Português', score: 97 }, { year: '2º Ano', subject: 'Matemática', score: 97 },
+            { year: '3º Ano', subject: 'Português', score: 97 }, { year: '3º Ano', subject: 'Matemática', score: 97 },
+            { year: '4º Ano', subject: 'Português', score: 97 }, { year: '4º Ano', subject: 'Matemática', score: 97 },
+            { year: '5º Ano', subject: 'Português', score: 97 }, { year: '5º Ano', subject: 'Matemática', score: 97 },
         ],
         isApproved: true,
         checklist: [
@@ -299,7 +314,7 @@ let applications: Application[] = [
     status: ApplicationStatus.ANALISE_CONCLUIDA,
     documents: [documents[3], documents[4]],
     specialNeeds: false,
-    finalScore: 88,
+    finalScore: 96,
     submissionDate: '2025-10-28T15:00:00Z',
   },
   {
@@ -307,253 +322,145 @@ let applications: Application[] = [
     protocol: '20250010',
     student: students[7], // Sofia Almeida
     edital: editais[0],
-    status: ApplicationStatus.ANALISE_CONCLUIDA,
-    documents: [documents[3], documents[4], documents[6]],
+    status: ApplicationStatus.ANALISE_INDEFERIDA,
+    documents: [documents[3], documents[6]],
     specialNeeds: true,
-    specialNeedsDocument: documents[6], // Invalid laudo
-    finalScore: 91,
+    specialNeedsDocuments: [documents[6]],
+    finalScore: 0,
     submissionDate: '2025-10-28T16:00:00Z',
+    analysis: {
+        analystId: '3',
+        analystName: 'Ana Lúcia (Analista)',
+        date: new Date().toISOString(),
+        justification: 'Documento indeferido laudo_invalido_sofia.pdf: Laudo médico vencido. É necessário um laudo emitido nos últimos 12 meses.',
+        observation: '',
+        grades: [],
+        isApproved: false,
+    }
   },
 ];
 
-// New data for Complementary Calls
-const callStart = new Date();
-callStart.setDate(today.getDate() - 2);
-
 let complementaryCalls: ComplementaryCall[] = [
-    {
-        id: 'cc1',
-        editalId: 'e1', // Edital 005/2024 - 6º Ano EF
-        title: '2ª Chamada Complementar',
-        startDate: callStart.toISOString(),
-        pdfUrl: 'https://raw.githubusercontent.com/mozilla/pdf.js-sample-files/master/tracemonkey.pdf',
-        pdfFileName: 'chamada_complementar_edital_005_2024.pdf'
-    },
-    {
-        id: 'cc2',
-        editalId: 'e1', // Same edital
-        title: '3ª Chamada Complementar - Vagas Remanescentes',
-        startDate: callStart.toISOString(),
-        pdfUrl: 'https://raw.githubusercontent.com/mozilla/pdf.js-sample-files/master/helloworld.pdf',
-        pdfFileName: 'chamada_complementar_3_edital_005_2024.pdf'
-    }
+    { id: 'cc1', editalId: 'e1', title: '1ª Chamada Complementar - 6º Ano', startDate: new Date(new Date().setDate(today.getDate() - 1)).toISOString(), pdfUrl: 'https://raw.githubusercontent.com/mozilla/pdf.js-sample-files/master/helloworld.pdf', pdfFileName: 'chamada_01.pdf'},
+    { id: 'cc2', editalId: 'e1', title: '2ª Chamada Complementar - 6º Ano', startDate: new Date(new Date().setDate(today.getDate() + 5)).toISOString(), pdfUrl: 'https://raw.githubusercontent.com/mozilla/pdf.js-sample-files/master/helloworld.pdf', pdfFileName: 'chamada_02.pdf'},
 ];
 
 let emailTemplates: EmailTemplate[] = [
     {
-        id: 'tmpl_1',
+        id: 't1',
         name: 'Confirmação de Inscrição',
         subject: 'Confirmação de Inscrição - Sistema Acesso CEP',
-        body: `Olá {{studentName}},
-
-Sua inscrição foi recebida com sucesso.
-
-Detalhes:
-- Protocolo: {{protocol}}
-- Edital: {{edital}}
-- Data de Envio: {{submissionDate}}
-
-Acompanhe o status no portal.
-
-Atenciosamente,
-Equipe do Colégio Estadual do Paraná (CEP)`,
+        body: `Olá,\n\nSua inscrição para o candidato {{studentName}} foi recebida com sucesso!\n\nDetalhes da Inscrição:\nProtocolo: {{protocol}}\nEdital: {{edital}}\nData de Envio: {{submissionDate}}\n\nAcompanhe o status da sua inscrição através do portal.\n\nAtenciosamente,\nEquipe do Colégio Estadual do Paraná`,
     },
     {
-        id: 'tmpl_2',
+        id: 't2',
         name: 'Documentação Incompleta',
-        subject: 'Ação Necessária: Documentação Incompleta na sua Inscrição',
-        body: `Olá {{studentName}},
-
-A análise da sua inscrição (protocolo {{protocol}}) encontrou pendências.
-
-Por favor, acesse o portal para visualizar as observações do analista e enviar os documentos corrigidos.
-
-Justificativa do analista:
-{{justification}}
-
-Atenciosamente,
-Equipe do Colégio Estadual do Paraná (CEP)`,
+        subject: 'Pendência na Inscrição - Sistema Acesso CEP',
+        body: `Olá {{responsibleName}},\n\nNotamos uma pendência na documentação da inscrição do candidato {{studentName}} (Protocolo: {{protocol}}).\n\nJustificativa do analista: {{justification}}\n\nPor favor, acesse o portal para verificar os detalhes e enviar os documentos corrigidos.\n\nAtenciosamente,\nEquipe do Colégio Estadual do Paraná`,
     },
 ];
 
 let logs: LogEntry[] = [];
+let logIdCounter = 0;
 
-const simulateDelay = (ms: number) => new Promise(res => setTimeout(res, ms));
+// --- UTILITY FUNCTIONS ---
 
-const addLog = (
-  actorId: string,
-  actorName: string,
-  action: string,
-  details: string,
-  targetType?: string,
-  targetId?: string
-) => {
-  const newLog: LogEntry = {
-    id: `log-${Date.now()}-${Math.random()}`,
-    timestamp: new Date().toISOString(),
-    actorId,
-    actorName,
-    action,
-    details,
-    targetType,
-    targetId,
-  };
-  logs.unshift(newLog);
+const delay = (ms: number) => new Promise(res => setTimeout(res, ms));
+
+const findUser = (cpf: string) => users.find(u => u.cpf === cpf);
+const findUserById = (id: string) => users.find(u => u.id === id);
+const findEdital = (id: string) => editais.find(e => e.id === id);
+const findStudent = (id: string) => students.find(s => s.id === id);
+
+const addLog = (actorId: string, actorName: string, action: string, targetType?: string, targetId?: string, details: string = '') => {
+    logs.unshift({
+        id: `log-${logIdCounter++}`,
+        timestamp: new Date().toISOString(),
+        actorId,
+        actorName,
+        action,
+        targetType,
+        targetId,
+        details
+    });
 };
 
-// --- API FUNCTIONS ---
+const renderEmailBody = (templateBody: string, context: Record<string, any>): string => {
+    let renderedBody = templateBody;
+    for (const key in context) {
+        const regex = new RegExp(`{{${key}}}`, 'g');
+        renderedBody = renderedBody.replace(regex, context[key]);
+    }
+    return renderedBody;
+};
+
+// --- API MOCK ---
 
 export const api = {
-  login: async (cpf: string): Promise<User | undefined> => {
-    await simulateDelay(500);
-    const user = users.find(u => u.cpf === cpf);
-    if (!user) {
-        throw new Error("Usuário não encontrado.");
+  // AUTH
+  login: async (cpf: string): Promise<User | null> => {
+    await delay(500);
+    const user = findUser(cpf);
+    if(user && !user.isActive) {
+        throw new Error("Este usuário está desativado. Entre em contato com o administrador.");
     }
-    if (!user.isActive) {
-        throw new Error("Este usuário está desativado. Contate o administrador.");
+    if (user) {
+        addLog(user.id, user.name, 'LOGIN_SUCCESS', 'User', user.id, `Usuário ${user.name} logado com sucesso.`);
+    } else {
+        addLog('system', 'System', 'LOGIN_FAILURE', 'User', cpf, `Tentativa de login falhou para o CPF: ${cpf}.`);
     }
-    addLog(user.id, user.name, 'LOGIN', 'Usuário realizou login com sucesso.');
-    return user;
+    return user ? { ...user } : null;
   },
 
-  getApplicationsForResponsible: async (cpf: string): Promise<Application[]> => {
-    await simulateDelay(800);
-    const userStudents = students.filter(s => s.responsibleCpf === cpf);
-    const studentIds = userStudents.map(s => s.id);
-    return applications.filter(app => studentIds.includes(app.student.id));
+  // USERS
+  getUsers: async (): Promise<User[]> => {
+    await delay(300);
+    return JSON.parse(JSON.stringify(users));
   },
-
-  getApplicationsForAnalyst: async (): Promise<Application[]> => {
-    await simulateDelay(800);
-    return applications.filter(app => [ApplicationStatus.EM_ANALISE, ApplicationStatus.DOCUMENTACAO_INCOMPLETA, ApplicationStatus.ANALISE_CONCLUIDA, ApplicationStatus.EM_RECURSO, ApplicationStatus.AGUARDANDO_PARECER_COMISSAO].includes(app.status));
-  },
-
-  getApplicationById: async (id: string): Promise<Application | undefined> => {
-    await simulateDelay(300);
-    const app = applications.find(app => app.id === id);
-    if (app) {
-        // Ensure specialNeedsDocument is also in the documents array for consistency
-        if (app.specialNeedsDocument && !app.documents.find(d => d.id === app.specialNeedsDocument!.id)) {
-            return { ...app, documents: [...app.documents, app.specialNeedsDocument] };
-        }
+  updateUser: async (id: string, data: Partial<User>): Promise<User> => {
+    await delay(300);
+    const userIndex = users.findIndex(u => u.id === id);
+    if (userIndex > -1) {
+      users[userIndex] = { ...users[userIndex], ...data };
+      addLog('system_admin', 'Admin', 'UPDATE_USER', 'User', id, `Usuário ${users[userIndex].name} atualizado.`);
+      return { ...users[userIndex] };
     }
-    return app;
+    throw new Error('User not found');
   },
-  
-  getAllApplications: async (): Promise<Application[]> => {
-      await simulateDelay(1000);
-      return [...applications];
-  },
-  
-  updateApplication: async (appId: string, data: Partial<Application>): Promise<Application> => {
-    await simulateDelay(700);
-    const appIndex = applications.findIndex(a => a.id === appId);
-    if(appIndex === -1) throw new Error("Aplicação não encontrada");
-    applications[appIndex] = { ...applications[appIndex], ...data };
-    return applications[appIndex];
-  },
-
-  submitAnalysis: async (appId: string, analysis: AnalysisResult, updatedDocs: Document[], newStatus: ApplicationStatus): Promise<Application> => {
-    await simulateDelay(1000);
-    const appIndex = applications.findIndex(a => a.id === appId);
-    if (appIndex === -1) throw new Error("Aplicação não encontrada");
-
-    const totalScore = analysis.grades.reduce((acc, grade) => acc + (grade.score || 0), 0);
-    
-    const app = applications[appIndex];
-    app.analysis = analysis;
-    app.documents = updatedDocs;
-    app.status = newStatus;
-    app.finalScore = (newStatus === ApplicationStatus.ANALISE_CONCLUIDA || newStatus === ApplicationStatus.AGUARDANDO_PARECER_COMISSAO) ? totalScore : app.finalScore;
-    
-    if (app.specialNeedsDocument) {
-        const updatedLaudo = updatedDocs.find(d => d.id === app.specialNeedsDocument!.id);
-        if (updatedLaudo) {
-            app.specialNeedsDocument = updatedLaudo;
-        }
+  deleteUser: async (id: string): Promise<void> => {
+    await delay(300);
+    const initialLength = users.length;
+    users = users.filter(u => u.id !== id);
+    if (users.length === initialLength) {
+      throw new Error('User not found');
     }
-    
-    addLog(analysis.analystId, analysis.analystName, 'SUBMIT_ANALYSIS', `Análise submetida para protocolo ${app.protocol}. Novo status: ${newStatus}.`, 'Application', appId);
-    return app;
+    addLog('system_admin', 'Admin', 'DELETE_USER', 'User', id, `Usuário com ID ${id} foi excluído.`);
   },
-  
-  getEditais: async (): Promise<Edital[]> => {
-      await simulateDelay(400);
-      return [...editais];
-  },
-
-  createEdital: async (editalData: EditalFormData): Promise<Edital> => {
-    await simulateDelay(600);
-    const newEdital: Edital = {
-        id: `e${Date.now()}`,
-        ...editalData,
-        isActive: true, // New editais are active by default
-    };
-    editais.push(newEdital);
-    addLog('system', 'Sistema', 'CREATE_EDITAL', `Edital "${newEdital.number}" criado.`, 'Edital', newEdital.id);
-    return newEdital;
+  createUser: async (userData: Omit<User, 'id'>): Promise<User> => {
+    await delay(300);
+    if (users.some(u => u.cpf === userData.cpf)) {
+        throw new Error('CPF já cadastrado no sistema.');
+    }
+    const newUser: User = { id: `u-${Date.now()}`, ...userData };
+    users.push(newUser);
+    addLog('system_admin', 'Admin', 'CREATE_USER', 'User', newUser.id, `Novo usuário ${newUser.name} criado.`);
+    return newUser;
   },
 
-  updateEdital: async(editalId: string, editalData: Partial<EditalFormData>): Promise<Edital> => {
-    await simulateDelay(600);
-    const editalIndex = editais.findIndex(e => e.id === editalId);
-    if (editalIndex === -1) throw new Error("Edital não encontrado.");
-    editais[editalIndex] = { ...editais[editalIndex], ...editalData };
-    addLog('system', 'Sistema', 'UPDATE_EDITAL', `Edital "${editais[editalIndex].number}" atualizado.`, 'Edital', editalId);
-    return editais[editalIndex];
+  // STUDENTS
+  getStudentsByResponsible: async (cpf: string): Promise<Student[]> => {
+    await delay(300);
+    return JSON.parse(JSON.stringify(students.filter(s => s.responsibleCpf === cpf)));
   },
-
-  deleteEdital: async(editalId: string): Promise<void> => {
-    await simulateDelay(600);
-    const editalIndex = editais.findIndex(e => e.id === editalId);
-    if (editalIndex === -1) throw new Error("Edital não encontrado.");
-    const editalNumber = editais[editalIndex].number;
-    editais.splice(editalIndex, 1);
-    complementaryCalls = complementaryCalls.filter(c => c.editalId !== editalId);
-    addLog('system', 'Sistema', 'DELETE_EDITAL', `Edital "${editalNumber}" excluído.`, 'Edital', editalId);
-  },
-
-  getComplementaryCalls: async (): Promise<ComplementaryCall[]> => {
-    await simulateDelay(300);
-    return [...complementaryCalls];
-  },
-
-  createComplementaryCall: async (data: Omit<ComplementaryCall, 'id'>): Promise<ComplementaryCall> => {
-    await simulateDelay(600);
-    const newCall: ComplementaryCall = {
-        id: `cc${Date.now()}`,
-        ...data,
-    };
-    complementaryCalls.push(newCall);
-    addLog('system', 'Sistema', 'CREATE_COMPLEMENTARY_CALL', `Chamada "${newCall.title}" criada para o edital ID ${newCall.editalId}.`, 'ComplementaryCall', newCall.id);
-    return newCall;
-  },
-  
-  deleteComplementaryCall: async (callId: string): Promise<void> => {
-    await simulateDelay(600);
-    const callIndex = complementaryCalls.findIndex(c => c.id === callId);
-    if (callIndex === -1) throw new Error("Chamada complementar não encontrada.");
-    const callTitle = complementaryCalls[callIndex].title;
-    complementaryCalls.splice(callIndex, 1);
-    addLog('system', 'Sistema', 'DELETE_COMPLEMENTARY_CALL', `Chamada "${callTitle}" excluída.`, 'ComplementaryCall', callId);
-  },
-
-  getStudentsByResponsible: async(cpf: string): Promise<Student[]> => {
-      await simulateDelay(600);
-      return students.filter(s => s.responsibleCpf === cpf);
-  },
-
-  findStudentByCgm: async (cgm: string, responsibleCpf: string): Promise<Student | undefined> => {
-    await simulateDelay(600);
+  findStudentByCgm: async (cgm: string, responsibleCpf: string): Promise<Student | null> => {
+    await delay(500);
     const student = students.find(s => s.cgm === cgm && s.responsibleCpf === responsibleCpf);
-    return student;
+    return student ? { ...student } : null;
   },
-
   createStudent: async (name: string, birthDate: string, responsibleCpf: string, rg?: string, uf?: string): Promise<Student> => {
-    await simulateDelay(700);
+    await delay(300);
     const newStudent: Student = {
-        id: `s${Date.now()}`,
+        id: `s-${Date.now()}`,
         name,
         birthDate,
         responsibleCpf,
@@ -561,263 +468,332 @@ export const api = {
         uf,
     };
     students.push(newStudent);
-    addLog('system', 'Sistema', 'CREATE_STUDENT', `Estudante "${name}" criado.`, 'Student', newStudent.id);
     return newStudent;
   },
 
-  createApplication: async(studentId: string, editalId: string, specialNeeds: boolean, siblingCgm?: string): Promise<Application> => {
-    await simulateDelay(1000);
-    const student = students.find(s => s.id === studentId);
-    const edital = editais.find(e => e.id === editalId);
-    if (!student || !edital) throw new Error("Estudante ou edital inválido.");
+  // EDITAIS
+  getEditais: async (): Promise<Edital[]> => {
+    await delay(300);
+    return JSON.parse(JSON.stringify(editais));
+  },
+  createEdital: async (editalData: EditalFormData): Promise<Edital> => {
+    await delay(500);
+    const newEdital: Edital = {
+        id: `e-${Date.now()}`,
+        ...editalData,
+    };
+    editais.unshift(newEdital);
+    addLog('system_admin', 'Admin', 'CREATE_EDITAL', 'Edital', newEdital.id, `Edital ${newEdital.number} criado.`);
+    return { ...newEdital };
+  },
+  updateEdital: async (id: string, editalData: EditalFormData): Promise<Edital> => {
+    await delay(500);
+    const index = editais.findIndex(e => e.id === id);
+    if (index > -1) {
+        editais[index] = { ...editais[index], ...editalData };
+        addLog('system_admin', 'Admin', 'UPDATE_EDITAL', 'Edital', id, `Edital ${editais[index].number} atualizado.`);
+        return { ...editais[index] };
+    }
+    throw new Error('Edital not found');
+  },
+  deleteEdital: async (id: string): Promise<void> => {
+    await delay(500);
+    editais = editais.filter(e => e.id !== id);
+    addLog('system_admin', 'Admin', 'DELETE_EDITAL', 'Edital', id, `Edital com ID ${id} excluído.`);
+  },
+
+  // APPLICATIONS
+  getAllApplications: async (): Promise<Application[]> => {
+    await delay(400);
+    return JSON.parse(JSON.stringify(applications.map(app => ({
+        ...app,
+        student: findStudent(app.student.id)!,
+        edital: findEdital(app.edital.id)!,
+    }))));
+  },
+  getApplicationsForResponsible: async (cpf: string): Promise<Application[]> => {
+    await delay(300);
+    const responsibleStudents = students.filter(s => s.responsibleCpf === cpf);
+    const studentIds = responsibleStudents.map(s => s.id);
+    return JSON.parse(JSON.stringify(
+      applications
+        .filter(app => studentIds.includes(app.student.id))
+        .map(app => ({
+          ...app,
+          student: findStudent(app.student.id)!,
+          edital: findEdital(app.edital.id)!,
+        }))
+    ));
+  },
+  getApplicationsForAnalyst: async (): Promise<Application[]> => {
+    await delay(300);
+    const statuses = [
+        ApplicationStatus.EM_ANALISE,
+        ApplicationStatus.DOCUMENTACAO_INCOMPLETA,
+        ApplicationStatus.EM_RECURSO,
+        ApplicationStatus.FIM_DE_FILA,
+        ApplicationStatus.AGUARDANDO_PARECER_COMISSAO,
+    ];
+    return JSON.parse(JSON.stringify(
+      applications
+        .filter(app => statuses.includes(app.status))
+        .map(app => ({
+          ...app,
+          student: findStudent(app.student.id)!,
+          edital: findEdital(app.edital.id)!,
+        }))
+    ));
+  },
+  getApplicationById: async (id: string): Promise<Application | null> => {
+    await delay(300);
+    const app = applications.find(a => a.id === id);
+    if (app) {
+      return JSON.parse(JSON.stringify({
+        ...app,
+        student: findStudent(app.student.id)!,
+        edital: findEdital(app.edital.id)!,
+      }));
+    }
+    return null;
+  },
+  createApplication: async (studentId: string, editalId: string, specialNeeds: boolean, siblingCgm: string): Promise<Application> => {
+    await delay(500);
+    const student = findStudent(studentId);
+    const edital = findEdital(editalId);
+    if (!student || !edital) throw new Error('Student or Edital not found');
 
     const newApplication: Application = {
-        id: `app${applications.length + 1}`,
-        protocol: `2025000${applications.length + 1}`,
-        student,
-        edital,
-        status: ApplicationStatus.INSCRICAO_PENDENTE,
-        documents: [],
-        specialNeeds: specialNeeds,
-        submissionDate: new Date().toISOString(),
-        siblingCgm: siblingCgm || undefined
+      id: `app-${Date.now()}`,
+      protocol: `${edital.year}${String(applications.length + 1).padStart(4, '0')}`,
+      student: student,
+      edital: edital,
+      status: ApplicationStatus.INSCRICAO_PENDENTE,
+      documents: [],
+      specialNeeds,
+      submissionDate: new Date().toISOString(),
+      siblingCgm,
     };
     applications.push(newApplication);
-    addLog(student.responsibleCpf, 'Responsável', 'CREATE_APPLICATION', `Inscrição criada para "${student.name}" no edital ${edital.number}.`, 'Application', newApplication.id);
-    return newApplication;
+    return { ...newApplication };
   },
-
-  getUsers: async(): Promise<User[]> => {
-    await simulateDelay(500);
-    return [...users];
-  },
-
-  createUser: async (userData: Omit<User, 'id'>): Promise<User> => {
-    await simulateDelay(600);
-    if (users.some(u => u.cpf === userData.cpf)) {
-      throw new Error("Já existe um usuário com este CPF.");
+  updateApplication: async (id: string, data: Partial<Application>): Promise<Application> => {
+    await delay(300);
+    const appIndex = applications.findIndex(a => a.id === id);
+    if (appIndex > -1) {
+      applications[appIndex] = { ...applications[appIndex], ...data };
+      return { ...applications[appIndex] };
     }
-    const newUser: User = {
-      id: `u${Date.now()}`,
-      isActive: true,
-      ...userData,
-    };
-    users.push(newUser);
-    addLog('system', 'Sistema', 'CREATE_USER', `Usuário "${newUser.name}" (${newUser.role}) criado.`, 'User', newUser.id);
-    return newUser;
+    throw new Error('Application not found');
   },
 
-  updateUser: async(userId: string, userData: Partial<User>): Promise<User> => {
-    await simulateDelay(500);
-    const userIndex = users.findIndex(u => u.id === userId);
-    if(userIndex === -1) throw new Error("Usuário não encontrado.");
-    const existingPermissions = users[userIndex].permissions || {};
-    const updatedPermissions = { ...existingPermissions, ...userData.permissions };
-    users[userIndex] = { ...users[userIndex], ...userData, permissions: updatedPermissions };
-    addLog('system', 'Sistema', 'UPDATE_USER', `Usuário "${users[userIndex].name}" atualizado.`, 'User', userId);
-    return users[userIndex];
-  },
-  
-  deleteUser: async(userId: string): Promise<void> => {
-    await simulateDelay(600);
-    const userIndex = users.findIndex(u => u.id === userId);
-    if (userIndex === -1) throw new Error("Usuário não encontrado.");
-    if (users[userIndex].role === UserRole.ADMIN_SEED) throw new Error("Não é possível excluir o usuário Admin SEED.");
-    const deletedUser = users[userIndex];
-    users.splice(userIndex, 1);
-    addLog('system', 'Sistema', 'DELETE_USER', `Usuário "${deletedUser.name}" excluído.`, 'User', userId);
-  },
-  
-  submitAppeal: async (appId: string, reason: string, justification: string, attachmentFile?: File): Promise<Application> => {
-    await simulateDelay(800);
-    const appIndex = applications.findIndex(a => a.id === appId);
-    if(appIndex === -1) throw new Error("Aplicação não encontrada");
-    const app = applications[appIndex];
+  // ANALYSIS
+  submitAnalysis: async (applicationId: string, analysis: AnalysisResult, updatedDocuments: Document[], newStatus: ApplicationStatus): Promise<void> => {
+    await delay(700);
+    const appIndex = applications.findIndex(app => app.id === applicationId);
+    if (appIndex > -1) {
+        applications[appIndex].analysis = analysis;
+        applications[appIndex].documents = updatedDocuments;
+        applications[appIndex].status = newStatus;
+        if (analysis.isApproved) {
+            const sum = analysis.grades.reduce((acc, grade) => acc + (grade.score || 0), 0);
+            applications[appIndex].finalScore = parseFloat((sum / analysis.grades.length).toFixed(2));
+        } else {
+            applications[appIndex].finalScore = 0;
+        }
 
-    let attachment: Document | undefined = undefined;
-    if (attachmentFile) {
-        const newDocId = `d-appeal-${Date.now()}`;
-        attachment = {
-            id: newDocId,
-            fileName: attachmentFile.name,
-            fileType: attachmentFile.type,
-            fileUrl: URL.createObjectURL(attachmentFile),
-            validationStatus: ValidationStatus.VALIDO,
+        const analyst = findUserById(analysis.analystId)!;
+        addLog(analyst.id, analyst.name, 'SUBMIT_ANALYSIS', 'Application', applicationId, `Análise do protocolo ${applications[appIndex].protocol} finalizada com status ${newStatus}.`);
+
+    } else {
+        throw new Error("Inscrição não encontrada.");
+    }
+  },
+  sendApplicationToEndOfQueue: async (applicationId: string, partialAnalysis: Partial<AnalysisResult>, updatedDocuments: Document[]): Promise<void> => {
+    await delay(500);
+    const appIndex = applications.findIndex(app => app.id === applicationId);
+    if (appIndex > -1) {
+        const app = applications[appIndex];
+        
+        // Update analysis data and documents
+        app.analysis = { ...(app.analysis || {}), ...partialAnalysis } as AnalysisResult;
+        app.documents = updatedDocuments;
+
+        // Set status to FIM_DE_FILA
+        app.status = ApplicationStatus.FIM_DE_FILA;
+
+        // Move to end of the array
+        applications.splice(appIndex, 1);
+        applications.push(app);
+        
+        const analyst = findUserById(partialAnalysis.analystId!);
+        addLog(analyst!.id, analyst!.name, 'SAVE_ANALYSIS_FOR_LATER', 'Application', applicationId, `Análise do protocolo ${app.protocol} salva para depois.`);
+    } else {
+        throw new Error("Inscrição não encontrada.");
+    }
+  },
+  getSpecialEducationApplications: async(): Promise<Application[]> => {
+    await delay(300);
+     return JSON.parse(JSON.stringify(
+      applications
+        .filter(app => app.status === ApplicationStatus.AGUARDANDO_PARECER_COMISSAO)
+        .map(app => ({
+          ...app,
+          student: findStudent(app.student.id)!,
+          edital: findEdital(app.edital.id)!,
+        }))
+    ));
+  },
+  submitCommissionDecision: async(applicationId: string, decision: Omit<CommissionAnalysis, 'date'>): Promise<void> => {
+    await delay(500);
+    const appIndex = applications.findIndex(app => app.id === applicationId);
+    if (appIndex > -1) {
+        applications[appIndex].commissionAnalysis = { ...decision, date: new Date().toISOString() };
+        if(decision.isEligible) {
+            // If eligible, it just continues in the flow
+            applications[appIndex].status = ApplicationStatus.ANALISE_CONCLUIDA;
+        } else {
+            // If not eligible, all laudos become invalid, and the status returns to 'ANALISE_CONCLUIDA'
+            // to proceed in the general vacancy ranking. The specialNeeds flag remains true for history.
+            if(applications[appIndex].specialNeedsDocuments) {
+                applications[appIndex].specialNeedsDocuments!.forEach(doc => {
+                    doc.validationStatus = ValidationStatus.INVALIDO;
+                    doc.invalidationReason = decision.justification;
+                })
+            }
+             applications[appIndex].status = ApplicationStatus.ANALISE_CONCLUIDA;
+        }
+        const member = findUserById(decision.commissionMemberId)!;
+        addLog(member.id, member.name, 'SUBMIT_COMMISSION_DECISION', 'Application', applicationId, `Decisão da comissão para ${applications[appIndex].protocol}: ${decision.isEligible ? 'Elegível' : 'Não Elegível'}`);
+    } else {
+      throw new Error("Application not found.");
+    }
+  },
+
+  // VACANCY
+  acceptVacancy: async (applicationId: string): Promise<void> => {
+    await delay(500);
+    const appIndex = applications.findIndex(app => app.id === applicationId);
+    if(appIndex > -1) {
+        applications[appIndex].status = ApplicationStatus.VAGA_ACEITA;
+    } else {
+        throw new Error("Inscrição não encontrada.");
+    }
+  },
+  declineVacancy: async (applicationId: string): Promise<void> => {
+    await delay(500);
+    const appIndex = applications.findIndex(app => app.id === applicationId);
+    if(appIndex > -1) {
+        applications[appIndex].status = ApplicationStatus.VAGA_RECUSADA;
+    } else {
+        throw new Error("Inscrição não encontrada.");
+    }
+  },
+
+  // APPEAL
+  submitAppeal: async (applicationId: string, reason: string, justification: string, attachment?: File): Promise<void> => {
+    await delay(600);
+    const appIndex = applications.findIndex(app => app.id === applicationId);
+    if (appIndex > -1) {
+        let attachmentDoc: Document | undefined = undefined;
+        if (attachment) {
+            attachmentDoc = {
+                id: `doc-appeal-${Date.now()}`,
+                fileName: attachment.name,
+                fileType: attachment.type,
+                fileUrl: URL.createObjectURL(attachment),
+                validationStatus: ValidationStatus.PENDENTE
+            }
+        }
+        applications[appIndex].appeal = {
+            protocol: `REC-${applications[appIndex].protocol}-${Date.now()}`,
+            reason,
+            justification,
+            attachment: attachmentDoc,
+            date: new Date().toISOString(),
+            status: AppealStatus.PENDENTE,
         };
-        documents.push(attachment);
+        applications[appIndex].status = ApplicationStatus.EM_RECURSO;
+    } else {
+        throw new Error("Inscrição não encontrada.");
     }
-
-    const appeal: Appeal = {
-        protocol: `REC-${app.protocol}-${Date.now()}`,
-        reason,
-        justification,
-        date: new Date().toISOString(),
-        status: AppealStatus.PENDENTE,
-        attachment,
-    };
-    
-    app.appeal = appeal;
-    app.status = ApplicationStatus.EM_RECURSO;
-    
-    addLog(app.student.responsibleCpf, 'Responsável', 'SUBMIT_APPEAL', `Recurso submetido para protocolo ${app.protocol}.`, 'Application', app.id);
-    return app;
   },
-
-  resolveAppeal: async (appId: string, decision: { status: AppealStatus.DEFERIDO | AppealStatus.INDEFERIDO, analystJustification: string }): Promise<Application> => {
-    await simulateDelay(800);
-    const appIndex = applications.findIndex(a => a.id === appId);
-    if(appIndex === -1) throw new Error("Aplicação não encontrada");
-    const app = applications[appIndex];
-    if (!app.appeal) throw new Error("Aplicação não possui um recurso para ser resolvido.");
-
-    const updatedAppeal: Appeal = {
-        ...app.appeal,
-        status: decision.status,
-        analystJustification: decision.analystJustification,
-    };
-
-    app.appeal = updatedAppeal;
-
-    if (decision.status === AppealStatus.INDEFERIDO) {
-        app.status = ApplicationStatus.CLASSIFICADO_PRELIMINAR; 
+  resolveAppeal: async (applicationId: string, resolution: { status: AppealStatus; analystJustification: string }): Promise<void> => {
+    await delay(500);
+    const appIndex = applications.findIndex(app => app.id === applicationId);
+    if (appIndex > -1 && applications[appIndex].appeal) {
+        applications[appIndex].appeal!.status = resolution.status;
+        applications[appIndex].appeal!.analystJustification = resolution.analystJustification;
+        if(resolution.status === AppealStatus.INDEFERIDO) {
+            // If appeal is denied, return to concluded status
+            applications[appIndex].status = ApplicationStatus.ANALISE_CONCLUIDA;
+        }
+        // If approved, status remains EM_RECURSO until analyst resubmits
+    } else {
+        throw new Error("Recurso ou inscrição não encontrado(a).");
     }
-    
-    addLog(app.analysis?.analystId || 'system', app.analysis?.analystName || 'Sistema', 'RESOLVE_APPEAL', `Recurso para protocolo ${app.protocol} foi ${decision.status}.`, 'Application', app.id);
-    return app;
   },
 
-  acceptVacancy: async (appId: string): Promise<Application> => {
-    await simulateDelay(500);
-    const appIndex = applications.findIndex(a => a.id === appId);
-    if(appIndex === -1) throw new Error("Aplicação não encontrada");
-    
-    const app = applications[appIndex];
-    app.status = ApplicationStatus.VAGA_ACEITA;
-    addLog(app.student.responsibleCpf, 'Responsável', 'ACCEPT_VACANCY', `Vaga para protocolo ${app.protocol} foi aceita.`, 'Application', appId);
-    return app;
+  // COMPLEMENTARY CALLS
+  getComplementaryCalls: async (): Promise<ComplementaryCall[]> => {
+    await delay(200);
+    return JSON.parse(JSON.stringify(complementaryCalls));
+  },
+  createComplementaryCall: async (callData: Omit<ComplementaryCall, 'id'>): Promise<ComplementaryCall> => {
+    await delay(400);
+    const newCall: ComplementaryCall = { ...callData, id: `cc-${Date.now()}` };
+    complementaryCalls.unshift(newCall);
+    return { ...newCall };
+  },
+  deleteComplementaryCall: async (id: string): Promise<void> => {
+    await delay(400);
+    complementaryCalls = complementaryCalls.filter(c => c.id !== id);
   },
 
-  declineVacancy: async (appId: string): Promise<Application> => {
-    await simulateDelay(500);
-    const appIndex = applications.findIndex(a => a.id === appId);
-    if(appIndex === -1) throw new Error("Aplicação não encontrada");
-    
-    const app = applications[appIndex];
-    app.status = ApplicationStatus.VAGA_RECUSADA;
-    addLog(app.student.responsibleCpf, 'Responsável', 'DECLINE_VACANCY', `Vaga para protocolo ${app.protocol} foi recusada.`, 'Application', appId);
-    return app;
-  },
-  
+  // EMAIL TEMPLATES
   getEmailTemplates: async (): Promise<EmailTemplate[]> => {
-    await simulateDelay(300);
-    return [...emailTemplates];
+    await delay(200);
+    return JSON.parse(JSON.stringify(emailTemplates));
   },
-
-  updateEmailTemplate: async (templateId: string, data: Partial<Omit<EmailTemplate, 'id' | 'name'>>): Promise<EmailTemplate> => {
-    await simulateDelay(500);
-    const templateIndex = emailTemplates.findIndex(t => t.id === templateId);
-    if (templateIndex === -1) throw new Error('Template não encontrado');
-    emailTemplates[templateIndex] = { ...emailTemplates[templateIndex], ...data };
-    addLog('system', 'Sistema', 'UPDATE_EMAIL_TEMPLATE', `Template "${emailTemplates[templateIndex].name}" atualizado.`, 'EmailTemplate', templateId);
-    return emailTemplates[templateIndex];
+  updateEmailTemplate: async (id: string, data: Partial<Omit<EmailTemplate, 'id' | 'name'>>): Promise<EmailTemplate> => {
+    await delay(400);
+    const index = emailTemplates.findIndex(t => t.id === id);
+    if (index > -1) {
+        emailTemplates[index] = { ...emailTemplates[index], ...data };
+        return { ...emailTemplates[index] };
+    }
+    throw new Error('Template not found');
   },
-
-  sendEmail: async (templateName: string, context: Record<string, string>): Promise<void> => {
-    await simulateDelay(200);
+  sendEmail: async (templateName: string, context: Record<string, any>): Promise<void> => {
+    await delay(100);
     const template = emailTemplates.find(t => t.name === templateName);
     if (!template) {
         console.error(`Email template "${templateName}" not found.`);
         return;
     }
+    
+    const { actorId, actorName, recipientEmail, ...emailContext } = context;
+    const body = renderEmailBody(template.body, emailContext);
+    
+    const bccRecipient = templateName === 'Confirmação de Inscrição' ? 'michel.delespinasse@escola.pr.gov.br' : undefined;
 
-    const mainRecipient = context.recipientEmail;
-    const recipientUser = users.find(u => u.email === mainRecipient);
-
-    addLog(
-      context.actorId || 'system',
-      context.actorName || 'Sistema',
-      'SEND_EMAIL',
-      `E-mail "${templateName}" enviado para ${mainRecipient}.`,
-      'User',
-      recipientUser?.id
-    );
-
-    const bccRecipient = templateName === 'Confirmação de Inscrição' ? 'michel.delespinasse@escola.pr.gov.br' : null;
-
-    console.log(`--- SIMULATING EMAIL SEND ---
-Template: ${template.name}
-To: ${mainRecipient || 'N/A'}
-BCC: ${bccRecipient || 'N/A'}
----------------------------`);
-  },
-  
-  getSpecialEducationApplications: async (): Promise<Application[]> => {
-    await simulateDelay(800);
-    return applications.filter(app => app.status === ApplicationStatus.AGUARDANDO_PARECER_COMISSAO);
+    console.log("--- SIMULATING EMAIL SEND ---");
+    console.log(`From: noreply@cep.pr.gov.br`);
+    console.log(`To: ${recipientEmail}`);
+    if (bccRecipient) {
+        console.log(`BCC: ${bccRecipient}`);
+    }
+    console.log(`Subject: ${template.subject}`);
+    console.log("--- BODY ---");
+    console.log(body);
+    console.log("----------------------------");
+    
+    const recipientUser = users.find(u => u.email === recipientEmail);
+    addLog(actorId, actorName, 'SEND_EMAIL', 'User', recipientUser?.id || recipientEmail, `Email "${template.name}" enviado para ${recipientEmail}.`);
   },
 
-  submitCommissionDecision: async (appId: string, decision: { isEligible: boolean; justification: string; commissionMemberId: string; commissionMemberName: string; }): Promise<Application> => {
-      await simulateDelay(1000);
-      const appIndex = applications.findIndex(a => a.id === appId);
-      if (appIndex === -1) throw new Error("Aplicação não encontrada");
-
-      const app = applications[appIndex];
-      const commissionAnalysis: CommissionAnalysis = {
-          ...decision,
-          date: new Date().toISOString()
-      };
-      
-      app.commissionAnalysis = commissionAnalysis;
-      app.status = ApplicationStatus.ANALISE_CONCLUIDA;
-
-      if (!decision.isEligible && app.specialNeedsDocument) {
-          const docId = app.specialNeedsDocument!.id;
-          const reason = `Indeferido pela comissão: ${decision.justification}`;
-          
-          const docIndex = documents.findIndex(d => d.id === docId);
-          if (docIndex !== -1) {
-              documents[docIndex].validationStatus = ValidationStatus.INVALIDO;
-              documents[docIndex].invalidationReason = reason;
-          }
-          
-          const appDocIndex = app.documents.findIndex(d => d.id === docId);
-          if(appDocIndex !== -1) {
-              app.documents[appDocIndex].validationStatus = ValidationStatus.INVALIDO;
-              app.documents[appDocIndex].invalidationReason = reason;
-          }
-          
-          app.specialNeedsDocument!.validationStatus = ValidationStatus.INVALIDO;
-          app.specialNeedsDocument!.invalidationReason = reason;
-      }
-      addLog(decision.commissionMemberId, decision.commissionMemberName, 'SUBMIT_COMMISSION_DECISION', `Decisão da comissão para protocolo ${app.protocol} foi ${decision.isEligible ? 'Elegível' : 'Inelegível'}.`, 'Application', appId);
-      return app;
-  },
-
-  getLogs: async (filters?: { userId?: string, text?: string }): Promise<LogEntry[]> => {
-      await simulateDelay(500);
-      if (!filters) {
-          return [...logs];
-      }
-
-      let filteredLogs = [...logs];
-
-      if (filters.userId && filters.userId !== 'all') {
-          filteredLogs = filteredLogs.filter(log =>
-              log.actorId === filters.userId ||
-              log.targetId === filters.userId
-          );
-      }
-      
-      if (filters.text) {
-          const searchText = filters.text.toLowerCase();
-          filteredLogs = filteredLogs.filter(log =>
-              log.actorName.toLowerCase().includes(searchText) ||
-              log.action.toLowerCase().replace(/_/g, ' ').includes(searchText) ||
-              log.details.toLowerCase().includes(searchText) ||
-              log.targetId?.toLowerCase().includes(searchText)
-          );
-      }
-
-      return filteredLogs;
-  },
+  // LOGS
+  getLogs: async(): Promise<LogEntry[]> => {
+    await delay(300);
+    return JSON.parse(JSON.stringify(logs));
+  }
 };
