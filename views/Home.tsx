@@ -66,7 +66,7 @@ const CountdownTimer = ({ endDate, variant = 'hero' }: { endDate: string, varian
     const timerComponents = Object.entries(timeLeft);
 
     if (!timerComponents.length) {
-        return <p className={currentStyle.endMessage}>Inscrições encerradas.</p>;
+        return <p className={currentStyle.endMessage}>Prazo encerrado.</p>;
     }
 
     return (
@@ -81,13 +81,67 @@ const CountdownTimer = ({ endDate, variant = 'hero' }: { endDate: string, varian
     );
 };
 
+const getEditalStatus = (edital: Edital, now: Date) => {
+    const today = new Date(now);
+    today.setHours(0, 0, 0, 0);
+
+    const start = new Date(edital.inscriptionStart);
+    const end = new Date(edital.inscriptionEnd);
+    end.setHours(23, 59, 59, 999);
+    const preliminaryResult = new Date(edital.preliminaryResultDate);
+    const appealEnd = new Date(edital.appealEndDate);
+    appealEnd.setHours(23, 59, 59, 999);
+    const finalResult = new Date(edital.resultDate);
+    const acceptanceStart = new Date(edital.vacancyAcceptanceStartDate);
+    const acceptanceEnd = new Date(edital.vacancyAcceptanceDate);
+    acceptanceEnd.setHours(23, 59, 59, 999);
+
+    if (now < start) {
+        return { text: `Inscrições em breve`, phase: 'UPCOMING' };
+    }
+    if (now >= start && now <= end) {
+        return { text: 'Inscrições Abertas', phase: 'INSCRIPTION' };
+    }
+    if (now > end && today < preliminaryResult) {
+        return { text: 'Em processamento', phase: 'PROCESSING' };
+    }
+    if (today >= preliminaryResult && now <= appealEnd) {
+        return { text: 'Período de Recurso', phase: 'APPEAL' };
+    }
+    if (now > appealEnd && today < finalResult) {
+        return { text: 'Aguardando Resultado Final', phase: 'FINALIZING' };
+    }
+    if (today >= finalResult && now < acceptanceStart) {
+        return { text: 'Resultado Final Divulgado', phase: 'RESULTS_OUT' };
+    }
+    if (now >= acceptanceStart && now <= acceptanceEnd) {
+        return { text: 'Aceite de Vaga', phase: 'ACCEPTANCE' };
+    }
+    if (now > acceptanceEnd) {
+        return { text: 'Processo Encerrado', phase: 'CLOSED' };
+    }
+    return null;
+};
+
+const statusBadgeColors: Record<string, string> = {
+    UPCOMING: 'bg-blue-100 text-blue-800 dark:bg-blue-200 dark:text-blue-900',
+    INSCRIPTION: 'bg-teal-100 text-teal-800 dark:bg-teal-200 dark:text-teal-900',
+    PROCESSING: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-200 dark:text-yellow-900',
+    APPEAL: 'bg-orange-100 text-orange-800 dark:bg-orange-200 dark:text-orange-900',
+    FINALIZING: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-200 dark:text-yellow-900',
+    RESULTS_OUT: 'bg-purple-100 text-purple-800 dark:bg-purple-200 dark:text-purple-900',
+    ACCEPTANCE: 'bg-green-100 text-green-800 dark:bg-green-200 dark:text-green-900',
+    CLOSED: 'bg-slate-200 text-slate-800 dark:bg-slate-600 dark:text-slate-300',
+};
+
 
 const Home = () => {
     const [editais, setEditais] = useState<Edital[]>([]);
     const [complementaryCalls, setComplementaryCalls] = useState<ComplementaryCall[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const navigate = useNavigate();
-    const [openEditalForHero, setOpenEditalForHero] = useState<Edital | null>(null);
+    const [heroEdital, setHeroEdital] = useState<Edital | null>(null);
+    const [heroStatus, setHeroStatus] = useState<{ text: string, phase: string } | null>(null);
     const { theme, toggleTheme } = useTheme();
 
     const [isCallsModalOpen, setIsCallsModalOpen] = useState(false);
@@ -99,13 +153,33 @@ const Home = () => {
                 const activeEditais = editalData.filter(e => e.isActive);
                 setEditais(activeEditais);
                 setComplementaryCalls(callData);
-                const currentlyOpen = activeEditais.find(edital => {
-                    const now = new Date();
-                    const start = new Date(edital.inscriptionStart);
-                    const end = new Date(edital.inscriptionEnd);
-                    return now >= start && now <= end;
-                });
-                setOpenEditalForHero(currentlyOpen || null);
+
+                const now = new Date();
+                const phasePriority = ['INSCRIPTION', 'ACCEPTANCE', 'APPEAL', 'RESULTS_OUT', 'FINALIZING', 'PROCESSING', 'UPCOMING', 'CLOSED'];
+
+                if (activeEditais.length > 0) {
+                    const editaisWithStatus = activeEditais
+                        .map(edital => ({
+                            edital,
+                            status: getEditalStatus(edital, now)
+                        }))
+                        .filter(item => item.status !== null);
+
+                    editaisWithStatus.sort((a, b) => {
+                        const priorityA = phasePriority.indexOf(a.status!.phase);
+                        const priorityB = phasePriority.indexOf(b.status!.phase);
+                        if (priorityA !== priorityB) return priorityA - priorityB;
+                        // If same phase, pick the one ending soonest (for timed phases)
+                        const endDateA = new Date(a.edital.vacancyAcceptanceDate);
+                        const endDateB = new Date(b.edital.vacancyAcceptanceDate);
+                        return endDateA.getTime() - endDateB.getTime();
+                    });
+
+                    if (editaisWithStatus.length > 0) {
+                        setHeroEdital(editaisWithStatus[0].edital);
+                        setHeroStatus(editaisWithStatus[0].status);
+                    }
+                }
             })
             .finally(() => setIsLoading(false));
     }, []);
@@ -120,6 +194,24 @@ const Home = () => {
     const openCallsModal = (calls: ComplementaryCall[]) => {
         setSelectedEditalCalls(calls);
         setIsCallsModalOpen(true);
+    };
+
+    const getButtonProps = (status: { text: string; phase: string } | null) => {
+        if (!status) return { text: 'Ver detalhes', disabled: true, onClick: () => {}, variant: 'secondary' };
+        
+        switch (status.phase) {
+            case 'INSCRIPTION':
+                return { text: 'Inscrever-se', disabled: false, onClick: () => navigate('/login'), variant: 'primary' };
+            case 'ACCEPTANCE':
+                 return { text: 'Acessar Portal', disabled: false, onClick: () => navigate('/login'), variant: 'secondary' };
+            case 'APPEAL':
+            case 'RESULTS_OUT':
+                return { text: 'Acessar Portal', disabled: false, onClick: () => navigate('/login'), variant: 'secondary' };
+            case 'CLOSED':
+                return { text: 'Ver Resultados', disabled: false, onClick: () => navigate('/login'), variant: 'secondary' };
+            default: // UPCOMING, PROCESSING, FINALIZING
+                return { text: status.text, disabled: true, onClick: () => {}, variant: 'secondary' };
+        }
     };
 
     return (
@@ -160,18 +252,25 @@ const Home = () => {
                             Venha estudar no <br/><span className="text-cep-accent">Maior Colégio</span> do Paraná
                         </h1>
                         <p className="mt-4 text-lg md:text-xl text-slate-200 max-w-3xl mx-auto">
-                            Junte-se à comunidade do Colégio Estadual do Paraná. Inscrições abertas por tempo limitado.
+                           {heroStatus ? `Status do Processo: ${heroStatus.text}` : 'Junte-se à comunidade do Colégio Estadual do Paraná.'}
                         </p>
                         <button 
-                          onClick={handleScrollToEditais} 
+                          onClick={heroStatus?.phase === 'INSCRIPTION' ? () => navigate('/login') : handleScrollToEditais} 
                           className="mt-8 inline-flex items-center gap-3 bg-cep-accent text-cep-header font-bold py-3 px-8 rounded-lg hover:bg-cep-accent/90 transition-colors text-lg shadow-lg hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-cep-header focus:ring-cep-accent"
                         >
-                           INSCREVA-SE AGORA
+                           {heroStatus?.phase === 'INSCRIPTION' ? 'INSCREVA-SE AGORA' : 'VER EDITAIS'}
                            <IconArrowRight className="h-5 w-5" />
                         </button>
-                         {openEditalForHero && (
+                         {heroEdital && heroStatus?.phase === 'INSCRIPTION' && (
                             <div className="mt-12">
-                                <CountdownTimer endDate={openEditalForHero.inscriptionEnd} variant="hero" />
+                                <p className="text-white mb-2">As inscrições para {heroEdital.modality} encerram em:</p>
+                                <CountdownTimer endDate={heroEdital.inscriptionEnd} variant="hero" />
+                            </div>
+                         )}
+                         {heroEdital && heroStatus?.phase === 'ACCEPTANCE' && (
+                            <div className="mt-12">
+                                <p className="text-white mb-2">O prazo para aceite de vaga encerra em:</p>
+                                <CountdownTimer endDate={heroEdital.vacancyAcceptanceDate} variant="hero" />
                             </div>
                          )}
                     </div>
@@ -195,10 +294,9 @@ const Home = () => {
                                 <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
                                     {editais.map(edital => {
                                         const now = new Date();
-                                        const start = new Date(edital.inscriptionStart);
-                                        const end = new Date(edital.inscriptionEnd);
-                                        const isOpen = now >= start && now <= end;
-                                        
+                                        const editalStatus = getEditalStatus(edital, now);
+                                        const buttonProps = getButtonProps(editalStatus);
+
                                         const activeCalls = complementaryCalls.filter(c => 
                                             c.editalId === edital.id && 
                                             now >= new Date(c.startDate)
@@ -207,26 +305,30 @@ const Home = () => {
                                             <div key={edital.id} className="bg-slate-50 dark:bg-slate-800 p-6 rounded-xl shadow-lg flex flex-col transition-transform hover:-translate-y-1 border border-slate-200 dark:border-slate-700">
                                                 <div className="flex justify-between items-start">
                                                     <span className="text-xs font-bold uppercase tracking-wider text-cep-primary dark:text-cep-accent">{edital.modality}</span>
-                                                    <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
-                                                        isOpen 
-                                                        ? 'bg-teal-100 text-teal-800 dark:bg-teal-200 dark:text-teal-900' 
-                                                        : 'bg-slate-200 text-slate-800 dark:bg-slate-600 dark:text-slate-300'
-                                                    }`}>
-                                                        {isOpen ? 'Aberto' : 'Fechado'}
-                                                    </span>
+                                                    {editalStatus && (
+                                                      <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${statusBadgeColors[editalStatus.phase] || 'bg-slate-200 text-slate-800'}`}>
+                                                          {editalStatus.text}
+                                                      </span>
+                                                    )}
                                                 </div>
                                                 <h3 className="text-xl font-semibold mt-2 text-cep-text dark:text-white">Edital {edital.number}</h3>
                                                 <div className="mt-4 text-sm text-slate-600 dark:text-slate-300 space-y-2 flex-grow">
                                                     <p><span className="font-semibold text-slate-800 dark:text-slate-100">Vagas:</span> {edital.vacancyDetails.reduce((sum, v) => sum + v.count, 0)}</p>
                                                     <p><span className="font-semibold text-slate-800 dark:text-slate-100">Inscrições:</span> {new Date(edital.inscriptionStart).toLocaleDateString('pt-BR')} a {new Date(edital.inscriptionEnd).toLocaleDateString('pt-BR')}</p>
                                                 </div>
-                                                {isOpen && (
+                                                {editalStatus?.phase === 'INSCRIPTION' && (
                                                     <div className="mt-4 pt-4 border-t border-slate-200 dark:border-slate-700">
                                                         <p className="text-xs text-center text-slate-500 dark:text-slate-400 mb-2">Tempo restante para inscrição:</p>
                                                         <CountdownTimer endDate={edital.inscriptionEnd} variant="card" />
                                                     </div>
                                                 )}
-                                                <div className={`mt-6 ${edital.editalPdfUrl ? 'flex items-center gap-2' : ''}`}>
+                                                {editalStatus?.phase === 'ACCEPTANCE' && (
+                                                    <div className="mt-4 pt-4 border-t border-slate-200 dark:border-slate-700">
+                                                        <p className="text-xs text-center text-slate-500 dark:text-slate-400 mb-2">Tempo restante para aceite:</p>
+                                                        <CountdownTimer endDate={edital.vacancyAcceptanceDate} variant="card" />
+                                                    </div>
+                                                )}
+                                                <div className="mt-6 flex flex-col space-y-2">
                                                     {edital.editalPdfUrl && (
                                                         <button 
                                                             onClick={() => window.open(edital.editalPdfUrl, '_blank')}
@@ -235,24 +337,25 @@ const Home = () => {
                                                             Ver Edital (PDF)
                                                         </button>
                                                     )}
-                                                    <div className='w-full'>
-                                                        {activeCalls.length > 0 ? (
-                                                            <button 
-                                                                onClick={() => openCallsModal(activeCalls)}
-                                                                className="w-full bg-blue-600 hover:bg-blue-700 text-white py-2 rounded-lg font-bold transition-colors"
-                                                            >
-                                                                Ver Chamadas Complementares
-                                                            </button>
-                                                        ) : isOpen ? (
-                                                            <button onClick={() => navigate('/login')} className="w-full bg-cep-primary hover:bg-cep-secondary text-white py-2 rounded-lg font-bold transition-colors">
-                                                                Inscrever-se
-                                                            </button>
-                                                        ) : (
-                                                            <button className="w-full bg-slate-200 text-slate-500 dark:bg-slate-700 dark:text-slate-400 py-2 rounded-lg font-bold cursor-not-allowed" disabled>
-                                                                Ver detalhes
-                                                            </button>
-                                                        )}
-                                                    </div>
+                                                    {activeCalls.length > 0 && (
+                                                         <button 
+                                                            onClick={() => openCallsModal(activeCalls)}
+                                                            className="w-full bg-blue-600 hover:bg-blue-700 text-white py-2 rounded-lg font-bold transition-colors"
+                                                        >
+                                                            Chamadas
+                                                        </button>
+                                                    )}
+                                                    <button 
+                                                      onClick={buttonProps.onClick} 
+                                                      disabled={buttonProps.disabled} 
+                                                      className={`w-full py-2 rounded-lg font-bold transition-colors ${
+                                                        buttonProps.variant === 'primary' 
+                                                          ? 'bg-cep-primary hover:bg-cep-secondary text-white' 
+                                                          : 'bg-slate-200 hover:bg-slate-300 text-slate-800 dark:bg-slate-700 dark:text-slate-200 dark:hover:bg-slate-600'
+                                                      } ${buttonProps.disabled ? 'cursor-not-allowed opacity-60' : ''}`}
+                                                    >
+                                                      {buttonProps.text}
+                                                    </button>
                                                 </div>
                                             </div>
                                         )
@@ -261,7 +364,7 @@ const Home = () => {
                              ) : (
                                 <div className="text-center py-16 bg-slate-50 dark:bg-slate-800/80 rounded-lg border border-slate-200 dark:border-slate-700">
                                     <IconFileText className="mx-auto h-12 w-12 text-gray-400 dark:text-gray-500"/>
-                                    <h3 className="mt-4 text-lg font-medium text-cep-text dark:text-white">Nenhum edital aberto no momento</h3>
+                                    <h3 className="mt-4 text-lg font-medium text-cep-text dark:text-white">Nenhum edital ativo no momento</h3>
                                     <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">Por favor, volte mais tarde para verificar novas oportunidades.</p>
                                 </div>
                             )

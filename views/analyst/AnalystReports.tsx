@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import Card, { CardContent, CardHeader, CardTitle } from '../../components/ui/Card';
 import Button from '../../components/ui/Button';
@@ -6,7 +5,7 @@ import { IconBarChart } from '../../constants';
 import { useToast } from '../../hooks/useToast';
 import { useAuth } from '../../hooks/useAuth';
 import { api } from '../../services/mockApi';
-import { downloadCSV } from '../../utils/reportGenerator';
+import { downloadXLSX } from '../../utils/reportGenerator';
 import { ApplicationStatus } from '../../types';
 
 const AnalystReports = () => {
@@ -41,7 +40,7 @@ const AnalystReports = () => {
             Data_Analise: new Date(app.analysis!.date).toLocaleString('pt-BR'),
             Pontuacao_Final: app.finalScore?.toFixed(2) ?? 'N/A',
           }));
-          downloadCSV(reportData, 'meu_relatorio_concluidas.csv');
+          downloadXLSX(reportData, 'meu_relatorio_concluidas.xlsx');
           break;
         }
         case 'Minhas Pendências Geradas': {
@@ -60,7 +59,7 @@ const AnalystReports = () => {
                 Data_Pendencia: new Date(app.analysis!.date).toLocaleString('pt-BR'),
                 Justificativa: app.analysis!.justification,
             }));
-           downloadCSV(reportData, 'meu_relatorio_pendencias.csv');
+           downloadXLSX(reportData, 'meu_relatorio_pendencias.xlsx');
            break;
         }
         default:
@@ -83,7 +82,7 @@ const AnalystReports = () => {
         </CardHeader>
         <CardContent>
           <p className="text-gray-600 dark:text-gray-400 mb-6">
-            Gere relatórios sobre suas atividades de análise. Os dados são exportados em formato CSV.
+            Gere relatórios sobre suas atividades de análise. Os dados são exportados em formato XLSX (Excel).
           </p>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             <ReportButton

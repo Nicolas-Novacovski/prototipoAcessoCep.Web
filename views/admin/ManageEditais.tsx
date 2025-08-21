@@ -1,6 +1,4 @@
 
-
-
 import React, { useState, useEffect } from 'react';
 import { Edital, EditalModalities, EditalFormData, VacancyDetail, VacancyType, VacancyShift, CustomRequirement } from '../../types';
 import { api } from '../../services/mockApi';
@@ -13,6 +11,53 @@ import Select from '../../components/ui/Select';
 import { IconEdit, IconTrash } from '../../constants';
 import { useToast } from '../../hooks/useToast';
 import ConfirmationModal from '../../components/ui/ConfirmationModal';
+
+const RequirementManager = ({ title, description, items, onAdd, onRemove, inputValue, onInputChange, placeholder, type }: {
+    title: string;
+    description: string;
+    items: CustomRequirement[];
+    onAdd: () => void;
+    onRemove: (id: string) => void;
+    inputValue: string;
+    onInputChange: (value: string) => void;
+    placeholder: string;
+    type: 'checklist' | 'document';
+}) => (
+    <div className="space-y-2 pt-4 border-t dark:border-slate-700">
+        <h3 className="text-lg font-medium text-cep-text dark:text-white">{title}</h3>
+        <p className="text-sm text-slate-500 dark:text-slate-400">{description}</p>
+        <div className="space-y-2 max-h-40 overflow-y-auto pr-2 rounded-md bg-slate-50 dark:bg-slate-800/50 p-2 border dark:border-slate-700">
+            {items.length === 0 ? (
+                <p className="text-sm text-slate-500 dark:text-slate-400 text-center py-2">Nenhum item adicionado.</p>
+            ) : items.map(item => (
+                <div key={item.id} className="flex items-center justify-between p-2 text-sm bg-white dark:bg-slate-700 rounded-md shadow-sm">
+                    <span>{item.label}</span>
+                    <button type="button" onClick={() => onRemove(item.id)} className="p-1 rounded-full hover:bg-red-100 dark:hover:bg-red-900/50">
+                        <IconTrash className="h-4 w-4 text-red-500"/>
+                    </button>
+                </div>
+            ))}
+        </div>
+        <div className="flex items-end gap-2 pt-2">
+            <Input 
+                id={`new-${type}`}
+                name={`new-${type}`}
+                label={`Novo ${type === 'checklist' ? 'item de checklist' : 'documento'}`}
+                value={inputValue}
+                onChange={e => onInputChange(e.target.value)}
+                className="flex-grow"
+                placeholder={placeholder}
+                onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                        e.preventDefault();
+                        onAdd();
+                    }
+                }}
+            />
+            <Button type="button" variant="secondary" onClick={onAdd}>Adicionar</Button>
+        </div>
+    </div>
+);
 
 const ManageEditais = () => {
   const [editais, setEditais] = useState<Edital[]>([]);
@@ -299,61 +344,14 @@ const EditalFormModal = ({ isOpen, onClose, onSave, edital }: { isOpen: boolean;
     setIsSaving(false);
   };
   
-  const RequirementManager = ({ title, description, items, onAdd, onRemove, inputValue, onInputChange, placeholder, type }: {
-    title: string;
-    description: string;
-    items: CustomRequirement[];
-    onAdd: () => void;
-    onRemove: (id: string) => void;
-    inputValue: string;
-    onInputChange: (value: string) => void;
-    placeholder: string;
-    type: 'checklist' | 'document';
-  }) => (
-        <div className="space-y-2 pt-4 border-t dark:border-slate-700">
-            <h3 className="text-lg font-medium text-cep-text dark:text-white">{title}</h3>
-            <p className="text-sm text-slate-500 dark:text-slate-400">{description}</p>
-            <div className="space-y-2 max-h-40 overflow-y-auto pr-2 rounded-md bg-slate-50 dark:bg-slate-800/50 p-2 border dark:border-slate-700">
-                {items.length === 0 ? (
-                    <p className="text-sm text-slate-500 dark:text-slate-400 text-center py-2">Nenhum item adicionado.</p>
-                ) : items.map(item => (
-                    <div key={item.id} className="flex items-center justify-between p-2 text-sm bg-white dark:bg-slate-700 rounded-md shadow-sm">
-                        <span>{item.label}</span>
-                        <button type="button" onClick={() => onRemove(item.id)} className="p-1 rounded-full hover:bg-red-100 dark:hover:bg-red-900/50">
-                            <IconTrash className="h-4 w-4 text-red-500"/>
-                        </button>
-                    </div>
-                ))}
-            </div>
-            <div className="flex items-end gap-2 pt-2">
-                <Input 
-                    id={`new-${type}`}
-                    name={`new-${type}`}
-                    label={`Novo ${type === 'checklist' ? 'item de checklist' : 'documento'}`}
-                    value={inputValue}
-                    onChange={e => onInputChange(e.target.value)}
-                    className="flex-grow"
-                    placeholder={placeholder}
-                    onKeyDown={(e) => {
-                        if (e.key === 'Enter') {
-                            e.preventDefault();
-                            onAdd();
-                        }
-                    }}
-                />
-                <Button type="button" variant="secondary" onClick={onAdd}>Adicionar</Button>
-            </div>
-        </div>
-  );
-
   return (
     <Modal isOpen={isOpen} onClose={onClose} title={edital ? 'Editar Edital' : 'Novo Edital'} size="3xl">
       <form onSubmit={handleSubmit} className="space-y-4">
-        <Input id="number" name="number" label="Número do Edital" value={formData.number} onChange={handleChange} required />
+        <Input id="number" name="number" label="Número do Edital" value={formData.number} onChange={handleChange} />
         <Select id="modality" name="modality" label="Modalidade" value={formData.modality} onChange={handleChange}>
           {Object.values(EditalModalities).map(m => <option key={m} value={m}>{m}</option>)}
         </Select>
-        <Input id="year" name="year" label="Ano" type="number" value={formData.year} onChange={handleChange} required />
+        <Input id="year" name="year" label="Ano" type="number" value={formData.year} onChange={handleChange} />
         <Input id="editalPdfUrl" name="editalPdfUrl" label="URL do PDF do Edital" value={formData.editalPdfUrl || ''} onChange={handleChange} placeholder="https://..." />
         
         <div className="space-y-4 pt-4 border-t dark:border-slate-700">
@@ -363,7 +361,7 @@ const EditalFormModal = ({ isOpen, onClose, onSave, edital }: { isOpen: boolean;
                     <div key={detail.id} className="grid grid-cols-10 gap-x-3 items-center p-3 border dark:border-slate-600 rounded-lg bg-slate-50 dark:bg-slate-800/50">
                         <div className="col-span-2">
                             <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">Qtd.</label>
-                            <Input id={`count-${detail.id}`} name="count" label="" type="number" value={detail.count} onChange={e => handleVacancyDetailChange(detail.id, 'count', e.target.value)} required />
+                            <Input id={`count-${detail.id}`} name="count" label="" type="number" value={detail.count} onChange={e => handleVacancyDetailChange(detail.id, 'count', e.target.value)} />
                         </div>
                         <div className="col-span-4">
                             <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">Modalidade da Vaga</label>
@@ -391,26 +389,26 @@ const EditalFormModal = ({ isOpen, onClose, onSave, edital }: { isOpen: boolean;
         </div>
 
         <div className="grid grid-cols-2 gap-4 pt-4 border-t dark:border-slate-700">
-            <Input id="inscriptionStart" name="inscriptionStart" label="Início das Inscrições" type="date" value={formData.inscriptionStart} onChange={handleChange} required />
-            <Input id="inscriptionEnd" name="inscriptionEnd" label="Fim das Inscrições" type="date" value={formData.inscriptionEnd} onChange={handleChange} required />
+            <Input id="inscriptionStart" name="inscriptionStart" label="Início das Inscrições" type="date" value={formData.inscriptionStart} onChange={handleChange} />
+            <Input id="inscriptionEnd" name="inscriptionEnd" label="Fim das Inscrições" type="date" value={formData.inscriptionEnd} onChange={handleChange} />
         </div>
         <div className="grid grid-cols-2 gap-4">
-            <Input id="analysisStart" name="analysisStart" label="Início da Análise" type="date" value={formData.analysisStart} onChange={handleChange} required />
-            <Input id="analysisEnd" name="analysisEnd" label="Fim da Análise" type="date" value={formData.analysisEnd} onChange={handleChange} required />
+            <Input id="analysisStart" name="analysisStart" label="Início da Análise" type="date" value={formData.analysisStart} onChange={handleChange} />
+            <Input id="analysisEnd" name="analysisEnd" label="Fim da Análise" type="date" value={formData.analysisEnd} onChange={handleChange} />
         </div>
         <div className="grid grid-cols-1 gap-4">
-             <Input id="preliminaryResultDate" name="preliminaryResultDate" label="Data de Divulgação dos Resultados Preliminares" type="date" value={formData.preliminaryResultDate} onChange={handleChange} required />
+             <Input id="preliminaryResultDate" name="preliminaryResultDate" label="Data de Divulgação dos Resultados Preliminares" type="date" value={formData.preliminaryResultDate} onChange={handleChange} />
         </div>
         <div className="grid grid-cols-2 gap-4">
-            <Input id="appealStartDate" name="appealStartDate" label="Início do Período de Recursos" type="date" value={formData.appealStartDate} onChange={handleChange} required />
-            <Input id="appealEndDate" name="appealEndDate" label="Fim do Período de Recursos" type="date" value={formData.appealEndDate} onChange={handleChange} required />
+            <Input id="appealStartDate" name="appealStartDate" label="Início do Período de Recursos" type="date" value={formData.appealStartDate} onChange={handleChange} />
+            <Input id="appealEndDate" name="appealEndDate" label="Fim do Período de Recursos" type="date" value={formData.appealEndDate} onChange={handleChange} />
         </div>
         <div className="grid grid-cols-1 gap-4">
-            <Input id="resultDate" name="resultDate" label="Data de Divulgação dos Resultados Finais" type="date" value={formData.resultDate} onChange={handleChange} required />
+            <Input id="resultDate" name="resultDate" label="Data de Divulgação dos Resultados Finais" type="date" value={formData.resultDate} onChange={handleChange} />
         </div>
         <div className="grid grid-cols-2 gap-4">
-            <Input id="vacancyAcceptanceStartDate" name="vacancyAcceptanceStartDate" label="Início do Aceite da Vaga" type="date" value={formData.vacancyAcceptanceStartDate} onChange={handleChange} required />
-            <Input id="vacancyAcceptanceDate" name="vacancyAcceptanceDate" label="Fim do Aceite da Vaga" type="date" value={formData.vacancyAcceptanceDate} onChange={handleChange} required />
+            <Input id="vacancyAcceptanceStartDate" name="vacancyAcceptanceStartDate" label="Início do Aceite da Vaga" type="date" value={formData.vacancyAcceptanceStartDate} onChange={handleChange} />
+            <Input id="vacancyAcceptanceDate" name="vacancyAcceptanceDate" label="Fim do Aceite da Vaga" type="date" value={formData.vacancyAcceptanceDate} onChange={handleChange} />
         </div>
         
         <RequirementManager

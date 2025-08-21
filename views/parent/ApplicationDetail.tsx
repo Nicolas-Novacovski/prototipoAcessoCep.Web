@@ -15,7 +15,6 @@ import ConfirmationModal from '../../components/ui/ConfirmationModal';
 const AppealForm = ({ applicationId, onAppealSubmitted }: { applicationId: string, onAppealSubmitted: () => void }) => {
     const [reason, setReason] = useState('');
     const [justification, setJustification] = useState('');
-    const [attachment, setAttachment] = useState<File | null>(null);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const { addToast } = useToast();
 
@@ -25,25 +24,6 @@ const AppealForm = ({ applicationId, onAppealSubmitted }: { applicationId: strin
         "Critério de desempate",
         "Outros motivos"
     ];
-    
-    const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        if (e.target.files && e.target.files[0]) {
-            const file = e.target.files[0];
-             if (file.type !== 'application/pdf') {
-                addToast('Apenas arquivos PDF são permitidos.', 'error');
-                setAttachment(null);
-                e.target.value = '';
-                return;
-            }
-            if (file.size > 10 * 1024 * 1024) { // 10MB
-                addToast(`Arquivo "${file.name}" excede o tamanho de 10MB.`, 'error');
-                setAttachment(null);
-                e.target.value = '';
-                return;
-            }
-            setAttachment(file);
-        }
-    }
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -53,7 +33,7 @@ const AppealForm = ({ applicationId, onAppealSubmitted }: { applicationId: strin
         }
         setIsSubmitting(true);
         try {
-            await api.submitAppeal(applicationId, reason, justification, attachment || undefined);
+            await api.submitAppeal(applicationId, reason, justification);
             addToast('Recurso enviado com sucesso.', 'success');
             onAppealSubmitted();
         } catch (err) {
@@ -90,31 +70,6 @@ const AppealForm = ({ applicationId, onAppealSubmitted }: { applicationId: strin
                             className="mt-1 block w-full px-3 py-2 bg-white dark:bg-slate-700 border border-gray-300 dark:border-slate-600 rounded-md shadow-sm focus:outline-none focus:ring-cep-primary focus:border-cep-primary sm:text-sm"
                             required
                         />
-                    </div>
-                     <div>
-                        <label htmlFor="attachment" className="block text-sm font-medium text-cep-text dark:text-slate-300">Anexar Documento (Opcional)</label>
-                        {!attachment ? (
-                            <input
-                                id="attachment"
-                                type="file"
-                                accept="application/pdf"
-                                onChange={handleFileChange}
-                                className="mt-1 block w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-cep-primary/10 file:text-cep-primary hover:file:bg-cep-primary/20"
-                            />
-                        ) : (
-                             <div className="flex items-center text-cep-text dark:text-slate-200 bg-gray-50 dark:bg-slate-700 p-2 rounded-md border dark:border-slate-600 mt-1">
-                                <IconFileText className="h-5 w-5 mr-3 text-gray-500 dark:text-gray-400 flex-shrink-0" />
-                                <span className="flex-1 truncate" title={attachment.name}>{attachment.name}</span>
-                                <button 
-                                    type="button"
-                                    onClick={() => setAttachment(null)} 
-                                    className="ml-4 p-1 text-gray-400 hover:text-red-600 rounded-full hover:bg-red-100 dark:hover:bg-red-900/50 transition-colors"
-                                    aria-label={`Remover ${attachment.name}`}
-                                >
-                                    <IconX className="h-4 w-4" />
-                                </button>
-                            </div>
-                        )}
                     </div>
                     <div className="text-right pt-2">
                         <Button type="submit" isLoading={isSubmitting}>Enviar Recurso</Button>
@@ -280,7 +235,7 @@ const ApplicationDetail = () => {
             id: docId,
             fileName: file.name,
             fileType: file.type,
-            fileUrl: URL.createObjectURL(file),
+            fileUrl: URL.createObjectURL(file), // MOCK
             validationStatus: ValidationStatus.PENDENTE,
             invalidationReason: undefined,
         };
@@ -521,19 +476,6 @@ const ApplicationDetail = () => {
                 <div><p className="text-sm font-semibold">Protocolo do Recurso:</p><p className="font-mono text-sm bg-gray-100 dark:bg-slate-700/50 p-2 rounded mt-1">{appeal.protocol}</p></div>
                 <div><p className="text-sm font-semibold">Motivo:</p><p>{appeal.reason}</p></div>
                 <div><p className="text-sm font-semibold">Sua Justificativa:</p><p className="whitespace-pre-wrap p-2 border dark:border-slate-700 rounded mt-1">{appeal.justification}</p></div>
-                {appeal.attachment && (
-                    <div>
-                        <p className="text-sm font-semibold">Anexo:</p>
-                        <div className="flex items-center gap-2">
-                            <a href={appeal.attachment.fileUrl} target="_blank" rel="noopener noreferrer" className="text-cep-primary hover:underline flex items-center gap-2">
-                               <IconFileText className="h-4 w-4" /> {appeal.attachment.fileName}
-                            </a>
-                             <a href={appeal.attachment.fileUrl} download={appeal.attachment.fileName} className="text-gray-400 hover:text-cep-primary" title="Baixar anexo">
-                                <IconDownload className="h-4 w-4" />
-                            </a>
-                        </div>
-                    </div>
-                )}
             </CardContent>
         </Card>
       )}

@@ -358,6 +358,13 @@ let emailTemplates: EmailTemplate[] = [
         subject: 'Pendência na Inscrição - Sistema Acesso CEP',
         body: `Olá {{responsibleName}},\n\nNotamos uma pendência na documentação da inscrição do candidato {{studentName}} (Protocolo: {{protocol}}).\n\nJustificativa do analista: {{justification}}\n\nPor favor, acesse o portal para verificar os detalhes e enviar os documentos corrigidos.\n\nAtenciosamente,\nEquipe do Colégio Estadual do Paraná`,
     },
+    {
+        id: 't3',
+        name: 'Confirmação de Inscrição',
+        editalId: 'e1',
+        subject: '[6º ANO] Confirmação de Inscrição no Processo Seletivo do CEP',
+        body: `Prezado(a) responsável,\n\nConfirmamos o recebimento da inscrição para o candidato {{studentName}} no processo seletivo para o 6º Ano do Ensino Fundamental (Edital {{edital}}).\n\nProtocolo: {{protocol}}\n\nLembre-se de acompanhar todas as etapas pelo portal.\n\nBoa sorte!\nEquipe do Colégio Estadual do Paraná`,
+    }
 ];
 
 let logs: LogEntry[] = [];
@@ -690,25 +697,14 @@ export const api = {
   },
 
   // APPEAL
-  submitAppeal: async (applicationId: string, reason: string, justification: string, attachment?: File): Promise<void> => {
+  submitAppeal: async (applicationId: string, reason: string, justification: string): Promise<void> => {
     await delay(600);
     const appIndex = applications.findIndex(app => app.id === applicationId);
     if (appIndex > -1) {
-        let attachmentDoc: Document | undefined = undefined;
-        if (attachment) {
-            attachmentDoc = {
-                id: `doc-appeal-${Date.now()}`,
-                fileName: attachment.name,
-                fileType: attachment.type,
-                fileUrl: URL.createObjectURL(attachment),
-                validationStatus: ValidationStatus.PENDENTE
-            }
-        }
         applications[appIndex].appeal = {
             protocol: `REC-${applications[appIndex].protocol}-${Date.now()}`,
             reason,
             justification,
-            attachment: attachmentDoc,
             date: new Date().toISOString(),
             status: AppealStatus.PENDENTE,
         };
@@ -754,24 +750,42 @@ export const api = {
     await delay(200);
     return JSON.parse(JSON.stringify(emailTemplates));
   },
-  updateEmailTemplate: async (id: string, data: Partial<Omit<EmailTemplate, 'id' | 'name'>>): Promise<EmailTemplate> => {
+  saveEmailTemplate: async (templateData: Omit<EmailTemplate, 'id'>): Promise<EmailTemplate> => {
     await delay(400);
-    const index = emailTemplates.findIndex(t => t.id === id);
-    if (index > -1) {
-        emailTemplates[index] = { ...emailTemplates[index], ...data };
-        return { ...emailTemplates[index] };
+    const { name, editalId, subject, body } = templateData;
+    
+    const existingIndex = emailTemplates.findIndex(t => t.name === name && t.editalId === editalId);
+    
+    if (existingIndex > -1) {
+        emailTemplates[existingIndex] = { ...emailTemplates[existingIndex], subject, body };
+        return { ...emailTemplates[existingIndex] };
+    } else {
+        const newTemplate: EmailTemplate = {
+            id: `t-${Date.now()}`,
+            name,
+            editalId,
+            subject,
+            body,
+        };
+        emailTemplates.push(newTemplate);
+        return newTemplate;
     }
-    throw new Error('Template not found');
   },
   sendEmail: async (templateName: string, context: Record<string, any>): Promise<void> => {
     await delay(100);
-    const template = emailTemplates.find(t => t.name === templateName);
+    
+    const { actorId, actorName, recipientEmail, editalId, ...emailContext } = context;
+
+    let template = emailTemplates.find(t => t.name === templateName && t.editalId === editalId);
     if (!template) {
-        console.error(`Email template "${templateName}" not found.`);
+        template = emailTemplates.find(t => t.name === templateName && !t.editalId);
+    }
+    
+    if (!template) {
+        console.error(`Email template "${templateName}" not found for editalId "${editalId}" or as default.`);
         return;
     }
     
-    const { actorId, actorName, recipientEmail, ...emailContext } = context;
     const body = renderEmailBody(template.body, emailContext);
     
     const bccRecipient = templateName === 'Confirmação de Inscrição' ? 'michel.delespinasse@escola.pr.gov.br' : undefined;

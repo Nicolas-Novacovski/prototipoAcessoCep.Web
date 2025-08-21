@@ -1,37 +1,51 @@
 
+
 import React, { useEffect, useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Application } from '../../types';
+import { Application, Edital } from '../../types';
 import { api } from '../../services/mockApi';
 import Card, { CardContent, CardHeader, CardTitle } from '../../components/ui/Card';
 import Spinner from '../../components/ui/Spinner';
 import { StatusBadge } from '../../components/ui/Badge';
 import Button from '../../components/ui/Button';
 import Input from '../../components/ui/Input';
+import Select from '../../components/ui/Select';
 
 const MonitorAnalyses = () => {
   const [applications, setApplications] = useState<Application[]>([]);
+  const [editais, setEditais] = useState<Edital[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
+  const [selectedEditalId, setSelectedEditalId] = useState('all');
   const navigate = useNavigate();
 
   useEffect(() => {
-    api.getAllApplications()
-      .then(setApplications)
-      .finally(() => setIsLoading(false));
+    Promise.all([
+        api.getAllApplications(),
+        api.getEditais()
+    ]).then(([apps, eds]) => {
+        setApplications(apps);
+        setEditais(eds);
+    }).finally(() => setIsLoading(false));
   }, []);
 
   const filteredApplications = useMemo(() => {
+    let filtered = applications;
+
+    if (selectedEditalId !== 'all') {
+        filtered = filtered.filter(app => app.edital.id === selectedEditalId);
+    }
+
     if (!searchTerm.trim()) {
-      return applications;
+      return filtered;
     }
     const lowercasedFilter = searchTerm.toLowerCase();
-    return applications.filter(app =>
+    return filtered.filter(app =>
       app.protocol.toLowerCase().includes(lowercasedFilter) ||
       app.student.name.toLowerCase().includes(lowercasedFilter) ||
       (app.analysis?.analystName || '').toLowerCase().includes(lowercasedFilter)
     );
-  }, [applications, searchTerm]);
+  }, [applications, searchTerm, selectedEditalId]);
 
   if (isLoading) {
     return <div className="flex justify-center items-center h-full"><Spinner /></div>;
@@ -44,15 +58,31 @@ const MonitorAnalyses = () => {
         <CardHeader>
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
             <CardTitle>Todas as Inscrições</CardTitle>
-            <Input
-              id="search-monitor"
-              label=""
-              type="text"
-              placeholder="Buscar por protocolo, candidato..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full sm:w-72"
-            />
+            <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+                <Select
+                    id="edital-filter"
+                    label=""
+                    value={selectedEditalId}
+                    onChange={(e) => setSelectedEditalId(e.target.value)}
+                    className="w-full sm:w-64"
+                >
+                    <option value="all">Todos os Editais</option>
+                    {editais.map(edital => (
+                        <option key={edital.id} value={edital.id}>
+                            Edital {edital.number} - {edital.modality}
+                        </option>
+                    ))}
+                </Select>
+                <Input
+                  id="search-monitor"
+                  label=""
+                  type="text"
+                  placeholder="Buscar por protocolo, candidato..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="w-full sm:w-72"
+                />
+            </div>
           </div>
         </CardHeader>
         <CardContent>

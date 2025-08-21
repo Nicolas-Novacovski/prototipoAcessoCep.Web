@@ -217,6 +217,7 @@ export interface EmailTemplate {
   name: string;
   subject: string;
   body: string; // HTML content
+  editalId?: string;
 }
 
 export interface LogEntry {

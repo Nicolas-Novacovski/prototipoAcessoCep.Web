@@ -1,7 +1,7 @@
 
 
 import React, { useState, useEffect } from 'react';
-import { EmailTemplate } from '../../types';
+import { EmailTemplate, Edital } from '../../types';
 import { api } from '../../services/mockApi';
 import Card, { CardContent, CardHeader, CardTitle } from '../../components/ui/Card';
 import Button from '../../components/ui/Button';
@@ -55,7 +55,9 @@ const renderEmailHtmlForPreview = (plainText: string): string => {
 
 const ManageEmailTemplates = () => {
   const [templates, setTemplates] = useState<EmailTemplate[]>([]);
-  const [selectedTemplateId, setSelectedTemplateId] = useState<string>('');
+  const [editais, setEditais] = useState<Edital[]>([]);
+  const [selectedTemplateName, setSelectedTemplateName] = useState<string>('');
+  const [selectedEditalId, setSelectedEditalId] = useState<string>('default');
   const [currentSubject, setCurrentSubject] = useState('');
   const [currentBody, setCurrentBody] = useState('');
   const [isLoading, setIsLoading] = useState(true);
@@ -63,33 +65,66 @@ const ManageEmailTemplates = () => {
   const { addToast } = useToast();
 
   useEffect(() => {
-    api.getEmailTemplates().then(data => {
-      setTemplates(data);
-      if (data.length > 0) {
-        setSelectedTemplateId(data[0].id);
-        setCurrentSubject(data[0].subject);
-        setCurrentBody(data[0].body);
-      }
-    }).finally(() => setIsLoading(false));
+    setIsLoading(true);
+    Promise.all([api.getEmailTemplates(), api.getEditais()])
+      .then(([templateData, editalData]) => {
+        setTemplates(templateData);
+        setEditais(editalData.filter(e => e.isActive));
+        if (templateData.length > 0) {
+          const uniqueNames = [...new Set(templateData.map(t => t.name))];
+          setSelectedTemplateName(uniqueNames[0] || '');
+        }
+      }).finally(() => setIsLoading(false));
   }, []);
 
-  const handleTemplateChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const templateId = e.target.value;
-    const template = templates.find(t => t.id === templateId);
-    if (template) {
-      setSelectedTemplateId(template.id);
-      setCurrentSubject(template.subject);
-      setCurrentBody(template.body);
+  useEffect(() => {
+    if (!selectedTemplateName) {
+      setCurrentSubject('');
+      setCurrentBody('');
+      return;
     }
+
+    const editalIdForSearch = selectedEditalId === 'default' ? undefined : selectedEditalId;
+    const specificTemplate = templates.find(t => t.name === selectedTemplateName && t.editalId === editalIdForSearch);
+
+    if (specificTemplate) {
+      setCurrentSubject(specificTemplate.subject);
+      setCurrentBody(specificTemplate.body);
+    } else {
+      const defaultTemplate = templates.find(t => t.name === selectedTemplateName && !t.editalId);
+      if (defaultTemplate) {
+        setCurrentSubject(defaultTemplate.subject);
+        setCurrentBody(defaultTemplate.body);
+      } else {
+        setCurrentSubject('');
+        setCurrentBody('');
+      }
+    }
+  }, [selectedTemplateName, selectedEditalId, templates]);
+
+  const handleTemplateNameChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    setSelectedTemplateName(e.target.value);
+  };
+  
+  const handleEditalChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    setSelectedEditalId(e.target.value);
   };
 
   const handleSave = async () => {
-    if (!selectedTemplateId) return;
+    if (!selectedTemplateName) return;
     setIsSaving(true);
     try {
-      await api.updateEmailTemplate(selectedTemplateId, { subject: currentSubject, body: currentBody });
-      // Update local state to avoid refetch
-      setTemplates(prev => prev.map(t => t.id === selectedTemplateId ? {...t, subject: currentSubject, body: currentBody} : t));
+      const templateData: Omit<EmailTemplate, 'id'> = {
+        name: selectedTemplateName,
+        editalId: selectedEditalId === 'default' ? undefined : selectedEditalId,
+        subject: currentSubject,
+        body: currentBody,
+      };
+
+      await api.saveEmailTemplate(templateData);
+      const updatedTemplates = await api.getEmailTemplates();
+      setTemplates(updatedTemplates);
+      
       addToast('Template salvo com sucesso!', 'success');
     } catch (err) {
       addToast(err instanceof Error ? err.message : 'Erro ao salvar o template.', 'error');
@@ -98,7 +133,7 @@ const ManageEmailTemplates = () => {
     }
   };
 
-  const selectedTemplate = templates.find(t => t.id === selectedTemplateId);
+  const uniqueTemplateNames = [...new Set(templates.map(t => t.name))];
   const emailPreviewHtml = renderEmailHtmlForPreview(currentBody);
 
   return (
@@ -110,10 +145,16 @@ const ManageEmailTemplates = () => {
             <CardTitle>Editor de Templates</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            <Select id="template" label="Selecione o Template para Editar" value={selectedTemplateId} onChange={handleTemplateChange}>
-              {templates.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
-            </Select>
-            {selectedTemplate && (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <Select id="template" label="Selecione o Template para Editar" value={selectedTemplateName} onChange={handleTemplateNameChange}>
+                {uniqueTemplateNames.map(name => <option key={name} value={name}>{name}</option>)}
+              </Select>
+              <Select id="edital" label="Aplicar a um Edital Específico" value={selectedEditalId} onChange={handleEditalChange}>
+                <option value="default">Padrão (para todos os editais)</option>
+                {editais.map(e => <option key={e.id} value={e.id}>{e.number} - {e.modality}</option>)}
+              </Select>
+            </div>
+            {selectedTemplateName && (
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 pt-4 border-t dark:border-slate-700">
                 <div className="space-y-4">
                   <Input id="subject" label="Assunto do E-mail" value={currentSubject} onChange={e => setCurrentSubject(e.target.value)} />
@@ -150,7 +191,7 @@ const ManageEmailTemplates = () => {
               </div>
             )}
             <div className="flex justify-end pt-4 border-t dark:border-slate-700">
-              <Button onClick={handleSave} isLoading={isSaving} disabled={!selectedTemplateId}>Salvar Template</Button>
+              <Button onClick={handleSave} isLoading={isSaving} disabled={!selectedTemplateName}>Salvar Template</Button>
             </div>
           </CardContent>
         </Card>

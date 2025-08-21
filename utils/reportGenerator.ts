@@ -1,33 +1,29 @@
-export const downloadCSV = (data: any[], filename: string = 'relatorio.csv') => {
+import * as XLSX from 'xlsx';
+
+export const downloadXLSX = (data: any[], filename: string = 'relatorio.xlsx') => {
   if (data.length === 0) {
     return;
   }
 
-  const headers = Object.keys(data[0]);
-  const csvRows = [
-    headers.join(','), // header row
-    ...data.map(row =>
-      headers
-        .map(fieldName => {
-          const value = row[fieldName];
-          const stringValue = value === null || value === undefined ? '' : String(value);
-          // Escape commas and quotes
-          const escaped = stringValue.replace(/"/g, '""');
-          return `"${escaped}"`;
-        })
-        .join(',')
-    ),
-  ];
+  // Create a new workbook
+  const workbook = XLSX.utils.book_new();
 
-  const csvString = csvRows.join('\n');
-  const blob = new Blob([csvString], { type: 'text/csv' });
-  const url = window.URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.setAttribute('hidden', '');
-  a.setAttribute('href', url);
-  a.setAttribute('download', filename);
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  window.URL.revokeObjectURL(url);
+  // Convert the array of objects to a worksheet
+  const worksheet = XLSX.utils.json_to_sheet(data);
+  
+  // Set column widths
+    const colWidths = Object.keys(data[0]).map(key => {
+        const maxLength = Math.max(
+            key.length,
+            ...data.map(row => String(row[key] ?? '').length)
+        );
+        return { wch: maxLength + 2 }; // +2 for padding
+    });
+    worksheet['!cols'] = colWidths;
+
+  // Append the worksheet to the workbook with a sheet name
+  XLSX.utils.book_append_sheet(workbook, worksheet, 'Relatório');
+
+  // Generate and trigger download
+  XLSX.writeFile(workbook, filename);
 };
