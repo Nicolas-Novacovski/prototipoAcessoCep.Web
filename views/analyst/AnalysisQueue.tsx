@@ -39,6 +39,7 @@ const AnalysisQueue = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedEditalId, setSelectedEditalId] = useState('all');
   const [statusFilter, setStatusFilter] = useState('pending');
+  const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'asc' | 'desc' }>({ key: 'submissionDate', direction: 'desc' });
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -50,8 +51,24 @@ const AnalysisQueue = () => {
       setEditais(eds);
     }).finally(() => setIsLoading(false));
   }, []);
+  
+  const requestSort = (key: string) => {
+    let direction: 'asc' | 'desc' = 'asc';
+    if (sortConfig && sortConfig.key === key && sortConfig.direction === 'asc') {
+      direction = 'desc';
+    }
+    setSortConfig({ key, direction });
+  };
 
-  const filteredApplications = useMemo(() => {
+  const getSortIndicator = (key: string) => {
+    if (!sortConfig || sortConfig.key !== key) {
+      return <span className="text-gray-400">↕</span>;
+    }
+    return sortConfig.direction === 'asc' ? '↑' : '↓';
+  };
+
+
+  const sortedAndFilteredApplications = useMemo(() => {
     let filtered = [...applications];
 
     if (statusFilter !== 'all') {
@@ -73,14 +90,57 @@ const AnalysisQueue = () => {
         (app.analysis?.analystName || '').toLowerCase().includes(lowercasedFilter)
       );
     }
+    
+    // Sorting logic
+    if (sortConfig) {
+      filtered.sort((a, b) => {
+        let aValue: any;
+        let bValue: any;
+
+        switch (sortConfig.key) {
+          case 'submissionDate':
+            aValue = new Date(a.submissionDate).getTime();
+            bValue = new Date(b.submissionDate).getTime();
+            break;
+          case 'studentName':
+            aValue = a.student.name.toLowerCase();
+            bValue = b.student.name.toLowerCase();
+            break;
+          case 'status':
+            aValue = a.status;
+            bValue = b.status;
+            break;
+          default:
+            return 0;
+        }
+
+        if (aValue < bValue) {
+          return sortConfig.direction === 'asc' ? -1 : 1;
+        }
+        if (aValue > bValue) {
+          return sortConfig.direction === 'asc' ? 1 : -1;
+        }
+        return 0;
+      });
+    }
+
     return filtered;
-  }, [applications, searchTerm, selectedEditalId, statusFilter]);
+  }, [applications, searchTerm, selectedEditalId, statusFilter, sortConfig]);
 
   if (isLoading) {
     return <div className="flex justify-center items-center h-full"><Spinner /></div>;
   }
   
   const isPendingView = statusFilter === 'pending';
+  
+  const SortableHeader = ({ title, sortKey }: { title: string; sortKey: string }) => (
+    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+        <button className="flex items-center gap-2 hover:text-gray-700 dark:hover:text-gray-200" onClick={() => requestSort(sortKey)}>
+            {title}
+            {getSortIndicator(sortKey)}
+        </button>
+    </th>
+  );
 
   return (
     <div className="space-y-6">
@@ -132,21 +192,21 @@ const AnalysisQueue = () => {
           </div>
         </CardHeader>
         <CardContent>
-          {filteredApplications.length > 0 ? (
+          {sortedAndFilteredApplications.length > 0 ? (
             <div className="overflow-x-auto">
               <table className="min-w-full divide-y divide-gray-200 dark:divide-slate-700">
                 <thead className="bg-gray-50 dark:bg-slate-700/50">
                   <tr>
-                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Protocolo</th>
-                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Candidato</th>
+                    <SortableHeader title="Protocolo" sortKey="submissionDate" />
+                    <SortableHeader title="Candidato" sortKey="studentName" />
                     <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Edital</th>
-                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Status</th>
+                    <SortableHeader title="Status" sortKey="status" />
                     <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Analista</th>
                     <th scope="col" className="relative px-6 py-3"><span className="sr-only">Ação</span></th>
                   </tr>
                 </thead>
                 <tbody className="bg-white dark:bg-slate-800 divide-y divide-gray-200 dark:divide-slate-700">
-                  {filteredApplications.map(app => (
+                  {sortedAndFilteredApplications.map(app => (
                     <tr key={app.id}>
                       <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-cep-text dark:text-white">{app.protocol}</td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">{app.student.name}</td>

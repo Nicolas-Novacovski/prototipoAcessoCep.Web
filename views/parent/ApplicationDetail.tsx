@@ -190,11 +190,17 @@ const ApplicationDetail = () => {
         });
     }
   }, [application]);
+  
+  const allDocs = useMemo(() => {
+    if (!application) return [];
+    const combined = [...application.documents, ...(application.specialNeedsDocuments || [])];
+    // Remove duplicates by ID, just in case
+    return Array.from(new Map(combined.map(doc => [doc.id, doc])).values());
+  }, [application]);
 
-    const docsForCorrection = useMemo(() => {
-        if (!application) return [];
-        return application.documents.filter(doc => doc.validationStatus === ValidationStatus.SOLICITADO_REENVIO);
-    }, [application]);
+  const docsForCorrection = useMemo(() => {
+    return allDocs.filter(doc => doc.validationStatus === ValidationStatus.SOLICITADO_REENVIO);
+  }, [allDocs]);
 
   const handleCorrectionFileChange = (docId: string, e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
@@ -308,7 +314,7 @@ const ApplicationDetail = () => {
     return <div className="flex justify-center items-center h-full"><Spinner /></div>;
   }
 
-  const { student, edital, status, documents, analysis, appeal } = application;
+  const { student, edital, status, analysis, appeal } = application;
 
   return (
     <div className="space-y-6">
@@ -510,7 +516,7 @@ const ApplicationDetail = () => {
         <CardHeader><CardTitle>Documentos Enviados</CardTitle></CardHeader>
         <CardContent>
           <ul className="space-y-2">
-            {documents.map(doc => {
+            {allDocs.map(doc => {
               const isLaudo = application.specialNeedsDocuments?.some(laudo => laudo.id === doc.id);
               return (
                 <li key={doc.id} className="flex items-center justify-between p-2 bg-gray-50 dark:bg-slate-700/50 rounded-lg">

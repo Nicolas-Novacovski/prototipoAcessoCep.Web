@@ -1,5 +1,6 @@
 
 
+
 import { User, UserRole, Application, ApplicationStatus, Edital, EditalModalities, Student, Document, AnalysisResult, EditalFormData, Appeal, ValidationStatus, VacancyType, VacancyShift, ComplementaryCall, EmailTemplate, CommissionAnalysis, AppealStatus, UserPermissions, LogEntry } from '../types';
 
 // --- MOCK DATABASE ---
@@ -140,13 +141,16 @@ let editais: Edital[] = [
 let documents: Document[] = [
     { id: 'd1', fileName: 'boletim_joao.pdf', fileType: 'application/pdf', fileUrl: 'https://raw.githubusercontent.com/mozilla/pdf.js-sample-files/master/helloworld.pdf', validationStatus: ValidationStatus.PENDENTE },
     { id: 'd2', fileName: 'declaracao_matricula_joao.pdf', fileType: 'application/pdf', fileUrl: 'https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf', validationStatus: ValidationStatus.PENDENTE },
-    { id: 'd3', fileName: 'laudo_maria.pdf', fileType: 'application/pdf', fileUrl: 'https://raw.githubusercontent.com/mozilla/pdf.js-sample-files/master/tracemonkey.pdf', validationStatus: ValidationStatus.PENDENTE },
+    { id: 'd3', fileName: 'laudo_maria.pdf', fileType: 'application/pdf', fileUrl: 'https://raw.githubusercontent.com/mozilla/pdf.js-sample-files/master/tracemonkey.pdf', validationStatus: ValidationStatus.VALIDO },
     // Docs for approved application
     { id: 'd4', fileName: 'boletim_aprovado_ana.pdf', fileType: 'application/pdf', fileUrl: 'https://raw.githubusercontent.com/mozilla/pdf.js-sample-files/master/helloworld.pdf', validationStatus: ValidationStatus.VALIDO },
     { id: 'd5', fileName: 'declaracao_aprovada_ana.pdf', fileType: 'application/pdf', fileUrl: 'https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf', validationStatus: ValidationStatus.VALIDO },
     { id: 'd6', fileName: 'laudo_valido_mariana.pdf', fileType: 'application/pdf', fileUrl: 'https://raw.githubusercontent.com/mozilla/pdf.js-sample-files/master/helloworld.pdf', validationStatus: ValidationStatus.VALIDO },
     { id: 'd7', fileName: 'laudo_invalido_sofia.pdf', fileType: 'application/pdf', fileUrl: 'https://raw.githubusercontent.com/mozilla/pdf.js-sample-files/master/tracemonkey.pdf', validationStatus: ValidationStatus.INVALIDO, invalidationReason: "Laudo médico vencido. É necessário um laudo emitido nos últimos 12 meses." },
     { id: 'd8', fileName: 'laudo_complementar_mariana.pdf', fileType: 'application/pdf', fileUrl: 'https://raw.githubusercontent.com/mozilla/pdf.js-sample-files/master/tracemonkey.pdf', validationStatus: ValidationStatus.VALIDO },
+    // Docs for Maria (app2 - incomplete docs)
+    { id: 'd9', fileName: 'boletim_maria_silva.pdf', fileType: 'application/pdf', fileUrl: 'https://raw.githubusercontent.com/mozilla/pdf.js-sample-files/master/helloworld.pdf', validationStatus: ValidationStatus.VALIDO },
+    { id: 'd10', fileName: 'residencia_ilegivel.pdf', fileType: 'application/pdf', fileUrl: 'https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf', validationStatus: ValidationStatus.SOLICITADO_REENVIO, invalidationReason: "Comprovante de residência ilegível. Por favor, envie uma cópia mais nítida." },
 ]
 
 let applications: Application[] = [
@@ -172,13 +176,25 @@ let applications: Application[] = [
   {
     id: 'app2',
     protocol: '20250002',
-    student: students[1],
+    student: students[1], // Maria da Silva
     edital: editais[0],
     status: ApplicationStatus.DOCUMENTACAO_INCOMPLETA,
-    documents: [],
+    documents: [
+      documents.find(d => d.id === 'd9')!,
+      documents.find(d => d.id === 'd10')!,
+    ],
     specialNeeds: true,
-    specialNeedsDocuments: [documents[2]],
+    specialNeedsDocuments: [documents.find(d => d.id === 'd3')!],
     submissionDate: '2025-10-26T14:30:00Z',
+    analysis: {
+        analystId: '3',
+        analystName: 'Ana Lúcia (Analista)',
+        date: new Date(new Date().setDate(today.getDate() - 2)).toISOString(),
+        justification: 'Um dos documentos está ilegível (comprovante de residência) e precisa ser reenviado. Por favor, verifique os itens marcados para correção e envie uma cópia mais nítida.',
+        observation: 'Pendente de correção de documento.',
+        grades: [],
+        isApproved: false,
+    }
   },
   {
     id: 'app3',

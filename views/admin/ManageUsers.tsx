@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useMemo } from 'react';
 import { User, UserRole, PermissionKey, UserPermissions, Edital, Application } from '../../types';
 import { api } from '../../services/mockApi';
@@ -12,6 +11,7 @@ import { IconEdit, IconTrash } from '../../constants';
 import { useToast } from '../../hooks/useToast';
 import ConfirmationModal from '../../components/ui/ConfirmationModal';
 import { useAuth } from '../../hooks/useAuth';
+import Pagination from '../../components/ui/Pagination';
 
 const allPermissions: { key: PermissionKey; label: string; }[] = [
     { key: 'manage_editais', label: 'Gerenciar Editais' },
@@ -47,6 +47,8 @@ const ManageUsers = () => {
   
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedEditalId, setSelectedEditalId] = useState('all');
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 10;
 
   const fetchUsers = () => {
     setIsLoading(true);
@@ -93,6 +95,22 @@ const ManageUsers = () => {
     
     return filtered;
   }, [users, searchTerm, selectedEditalId, applications]);
+  
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, selectedEditalId]);
+
+  const totalPages = Math.ceil(filteredUsers.length / itemsPerPage);
+  const paginatedUsers = filteredUsers.slice(
+    (currentPage - 1) * itemsPerPage,
+    currentPage * itemsPerPage
+  );
+
+  const handlePageChange = (page: number) => {
+    if (page >= 1 && page <= totalPages) {
+      setCurrentPage(page);
+    }
+  };
 
   const openModalForNew = () => {
     setEditingUser(null);
@@ -205,8 +223,17 @@ const ManageUsers = () => {
               </div>
           </div>
         </CardHeader>
-        <CardContent>
-          {isLoading ? <Spinner /> : <UserTable users={filteredUsers} applications={applications} onEdit={openModalForEdit} onDelete={openConfirmModal} onToggleActive={handleToggleActive} currentUser={currentUser} />}
+        <CardContent className="p-0">
+          {isLoading ? <div className="p-6"><Spinner /></div> : (
+            <>
+              <UserTable users={paginatedUsers} applications={applications} onEdit={openModalForEdit} onDelete={openConfirmModal} onToggleActive={handleToggleActive} currentUser={currentUser} />
+              <Pagination
+                currentPage={currentPage}
+                totalPages={totalPages}
+                onPageChange={handlePageChange}
+              />
+            </>
+          )}
         </CardContent>
       </Card>
       {isModalOpen && (

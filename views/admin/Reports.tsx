@@ -1,20 +1,54 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Card, { CardContent, CardHeader, CardTitle } from '../../components/ui/Card';
 import Button from '../../components/ui/Button';
 import { IconBarChart } from '../../constants';
 import { useToast } from '../../hooks/useToast';
 import { api } from '../../services/mockApi';
 import { downloadXLSX } from '../../utils/reportGenerator';
-import { ApplicationStatus } from '../../types';
+import { ApplicationStatus, Edital } from '../../types';
+import Select from '../../components/ui/Select';
 
 const Reports = () => {
   const { addToast } = useToast();
   const [loadingReport, setLoadingReport] = useState<string | null>(null);
+  const [editais, setEditais] = useState<Edital[]>([]);
+  const [selectedEditalId, setSelectedEditalId] = useState<string>('all');
+
+  useEffect(() => {
+    api.getEditais().then(setEditais);
+  }, []);
 
   const handleGenerateReport = async (reportType: string) => {
     setLoadingReport(reportType);
     try {
-      const apps = await api.getAllApplications();
+      const selectedEdital = editais.find(e => e.id === selectedEditalId);
+      const editalIdentifier = selectedEdital ? `edital_${selectedEdital.number.replace('/', '-')}` : 'todos_os_editais';
+
+      if (reportType === 'Logs de Auditoria') {
+        const logs = await api.getLogs();
+        const reportData = logs.map(log => ({
+          Timestamp: new Date(log.timestamp).toLocaleString('pt-BR'),
+          Autor: log.actorName,
+          Acao: log.action,
+          Detalhes: log.details,
+        }));
+        downloadXLSX(reportData, 'relatorio_auditoria.xlsx');
+        addToast(`Relatório "${reportType}" gerado com sucesso!`, 'success');
+        setLoadingReport(null); // Manually set loading to null before early return
+        return;
+      }
+
+      let apps = await api.getAllApplications();
+      if (selectedEditalId !== 'all') {
+        apps = apps.filter(app => app.edital.id === selectedEditalId);
+      }
+      
+      if (apps.length === 0) {
+          addToast('Nenhum dado encontrado para os filtros selecionados.', 'info');
+          setLoadingReport(null);
+          return;
+      }
+
       switch (reportType) {
         case 'Lista de Inscritos': {
           const reportData = apps.map(app => ({
@@ -26,20 +60,25 @@ const Reports = () => {
             Status: app.status,
             DataInscricao: new Date(app.submissionDate).toLocaleString('pt-BR')
           }));
-          downloadXLSX(reportData, 'relatorio_inscritos.xlsx');
+          downloadXLSX(reportData, `relatorio_inscritos_${editalIdentifier}.xlsx`);
           break;
         }
         case 'Lista Preliminar': {
            const preliminaryApps = apps
             .filter(app => app.status === ApplicationStatus.CLASSIFICADO_PRELIMINAR)
             .sort((a, b) => (b.finalScore ?? 0) - (a.finalScore ?? 0));
+           if (preliminaryApps.length === 0) {
+               addToast('Nenhum candidato na lista preliminar para os filtros selecionados.', 'info');
+               setLoadingReport(null);
+               return;
+           }
            const reportData = preliminaryApps.map((app, index) => ({
             Classificacao: index + 1,
             Protocolo: app.protocol,
             Candidato: app.student.name,
             Pontuacao_Preliminar: app.finalScore?.toFixed(2),
            }));
-           downloadXLSX(reportData, 'relatorio_classificados_preliminar.xlsx');
+           downloadXLSX(reportData, `relatorio_classificados_preliminar_${editalIdentifier}.xlsx`);
            break;
         }
         case 'Lista Final de Classificados': {
@@ -49,6 +88,11 @@ const Reports = () => {
                 app.status === ApplicationStatus.VAGA_ACEITA
             )
             .sort((a, b) => (b.finalScore ?? 0) - (a.finalScore ?? 0));
+           if (finalApps.length === 0) {
+               addToast('Nenhum candidato na lista final para os filtros selecionados.', 'info');
+               setLoadingReport(null);
+               return;
+           }
            const reportData = finalApps.map((app, index) => ({
             Classificacao: index + 1,
             Protocolo: app.protocol,
@@ -56,13 +100,14 @@ const Reports = () => {
             Pontuacao_Final: app.finalScore?.toFixed(2),
             Status_Final: app.status,
            }));
-           downloadXLSX(reportData, 'relatorio_classificados_final.xlsx');
+           downloadXLSX(reportData, `relatorio_classificados_final_${editalIdentifier}.xlsx`);
            break;
         }
         case 'Lista de Recursos': {
           const appsWithAppeals = apps.filter(app => !!app.appeal);
           if (appsWithAppeals.length === 0) {
-              addToast('Nenhum recurso foi encontrado no sistema.', 'info');
+              addToast('Nenhum recurso foi encontrado para os filtros selecionados.', 'info');
+              setLoadingReport(null);
               return;
           }
           const reportData = appsWithAppeals.map(app => ({
@@ -72,7 +117,7 @@ const Reports = () => {
             Status_Recurso: app.appeal?.status,
             Motivo_Recurso: app.appeal?.reason,
           }));
-          downloadXLSX(reportData, 'relatorio_recursos.xlsx');
+          downloadXLSX(reportData, `relatorio_recursos_${editalIdentifier}.xlsx`);
           break;
         }
         case 'Estatísticas Gerais': {
@@ -84,18 +129,7 @@ const Reports = () => {
                 Status: status,
                 Quantidade: count
            }));
-           downloadXLSX(reportData, 'relatorio_estatisticas.xlsx');
-           break;
-        }
-        case 'Logs de Auditoria': {
-           const logs = await api.getLogs();
-           const reportData = logs.map(log => ({
-             Timestamp: new Date(log.timestamp).toLocaleString('pt-BR'),
-             Autor: log.actorName,
-             Acao: log.action,
-             Detalhes: log.details,
-           }));
-           downloadXLSX(reportData, 'relatorio_auditoria.xlsx');
+           downloadXLSX(reportData, `relatorio_estatisticas_${editalIdentifier}.xlsx`);
            break;
         }
         default:
@@ -114,12 +148,30 @@ const Reports = () => {
       <h1 className="text-3xl font-bold text-cep-text dark:text-white">Relatórios e Exportação</h1>
       <Card>
         <CardHeader>
-          <CardTitle>Gerar Relatórios</CardTitle>
+           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                <div>
+                    <CardTitle>Gerar Relatórios</CardTitle>
+                    <p className="text-gray-600 dark:text-gray-400 text-sm mt-1">
+                        Selecione um edital e um tipo de relatório para exportar os dados em formato XLSX.
+                    </p>
+                </div>
+                <Select
+                    id="edital-filter"
+                    label=""
+                    value={selectedEditalId}
+                    onChange={(e) => setSelectedEditalId(e.target.value)}
+                    className="w-full sm:w-80"
+                >
+                    <option value="all">Todos os Editais</option>
+                    {editais.map(edital => (
+                        <option key={edital.id} value={edital.id}>
+                            Edital {edital.number} - {edital.modality}
+                        </option>
+                    ))}
+                </Select>
+            </div>
         </CardHeader>
         <CardContent>
-          <p className="text-gray-600 dark:text-gray-400 mb-6">
-            Selecione um tipo de relatório para gerar e exportar os dados do sistema em formato XLSX (Excel).
-          </p>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             <ReportButton
               title="Lista de Inscritos"
@@ -153,7 +205,7 @@ const Reports = () => {
             />
              <ReportButton
               title="Logs de Auditoria"
-              description="Exporta logs do sistema para fins de auditoria e segurança."
+              description="Exporta logs do sistema para fins de auditoria e segurança (ignora filtro de edital)."
               onClick={() => handleGenerateReport('Logs de Auditoria')}
                isLoading={loadingReport === 'Logs de Auditoria'}
             />

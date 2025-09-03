@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useMemo } from 'react';
 import { LogEntry, User } from '../../types';
 import { api } from '../../services/mockApi';
@@ -6,6 +5,7 @@ import Card, { CardContent, CardHeader, CardTitle } from '../../components/ui/Ca
 import Spinner from '../../components/ui/Spinner';
 import Input from '../../components/ui/Input';
 import Select from '../../components/ui/Select';
+import Pagination from '../../components/ui/Pagination';
 
 const AuditLogs = () => {
     const [logs, setLogs] = useState<LogEntry[]>([]);
@@ -18,6 +18,8 @@ const AuditLogs = () => {
     const [startDate, setStartDate] = useState<string>('');
     const [endDate, setEndDate] = useState<string>('');
     const [searchText, setSearchText] = useState<string>('');
+    const [currentPage, setCurrentPage] = useState(1);
+    const itemsPerPage = 10;
 
     useEffect(() => {
         setIsLoading(true);
@@ -70,6 +72,22 @@ const AuditLogs = () => {
 
         return currentLogs;
     }, [selectedUserId, selectedAction, startDate, endDate, searchText, logs]);
+    
+    useEffect(() => {
+        setCurrentPage(1);
+    }, [selectedUserId, selectedAction, startDate, endDate, searchText]);
+
+    const totalPages = Math.ceil(filteredLogs.length / itemsPerPage);
+    const paginatedLogs = filteredLogs.slice(
+        (currentPage - 1) * itemsPerPage,
+        currentPage * itemsPerPage
+    );
+
+    const handlePageChange = (page: number) => {
+        if (page >= 1 && page <= totalPages) {
+            setCurrentPage(page);
+        }
+    };
 
     return (
         <div className="space-y-6">
@@ -125,48 +143,55 @@ const AuditLogs = () => {
                         />
                     </div>
                 </CardHeader>
-                <CardContent>
+                <CardContent className="p-0">
                     {isLoading ? (
-                        <div className="h-64 flex items-center justify-center">
+                        <div className="h-64 flex items-center justify-center p-6">
                             <Spinner />
                         </div>
                     ) : (
-                        <div className="overflow-x-auto">
-                            <table className="min-w-full divide-y divide-gray-200 dark:divide-slate-700">
-                                <thead className="bg-gray-50 dark:bg-slate-700/50">
-                                    <tr>
-                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Data/Hora</th>
-                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Autor</th>
-                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Ação</th>
-                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Detalhes</th>
-                                    </tr>
-                                </thead>
-                                <tbody className="bg-white dark:bg-slate-800 divide-y divide-gray-200 dark:divide-slate-700">
-                                    {filteredLogs.length > 0 ? filteredLogs.map(log => (
-                                        <tr key={log.id}>
-                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                                                {new Date(log.timestamp).toLocaleString('pt-BR')}
-                                            </td>
-                                            <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-cep-text dark:text-white">
-                                                {log.actorName}
-                                            </td>
-                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                                                <span className="font-mono bg-gray-100 dark:bg-slate-700 px-2 py-1 rounded text-xs">{log.action}</span>
-                                            </td>
-                                            <td className="px-6 py-4 whitespace-normal text-sm text-gray-500 dark:text-gray-400 max-w-lg">
-                                                {log.details}
-                                            </td>
-                                        </tr>
-                                    )) : (
+                        <>
+                            <div className="overflow-x-auto">
+                                <table className="min-w-full divide-y divide-gray-200 dark:divide-slate-700">
+                                    <thead className="bg-gray-50 dark:bg-slate-700/50">
                                         <tr>
-                                            <td colSpan={4} className="text-center py-10 text-gray-500 dark:text-gray-400">
-                                                Nenhum log encontrado para os filtros aplicados.
-                                            </td>
+                                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Data/Hora</th>
+                                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Autor</th>
+                                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Ação</th>
+                                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Detalhes</th>
                                         </tr>
-                                    )}
-                                </tbody>
-                            </table>
-                        </div>
+                                    </thead>
+                                    <tbody className="bg-white dark:bg-slate-800 divide-y divide-gray-200 dark:divide-slate-700">
+                                        {filteredLogs.length > 0 ? paginatedLogs.map(log => (
+                                            <tr key={log.id}>
+                                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                                                    {new Date(log.timestamp).toLocaleString('pt-BR')}
+                                                </td>
+                                                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-cep-text dark:text-white">
+                                                    {log.actorName}
+                                                </td>
+                                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                                                    <span className="font-mono bg-gray-100 dark:bg-slate-700 px-2 py-1 rounded text-xs">{log.action}</span>
+                                                </td>
+                                                <td className="px-6 py-4 whitespace-normal text-sm text-gray-500 dark:text-gray-400 max-w-lg">
+                                                    {log.details}
+                                                </td>
+                                            </tr>
+                                        )) : (
+                                            <tr>
+                                                <td colSpan={4} className="text-center py-10 text-gray-500 dark:text-gray-400">
+                                                    Nenhum log encontrado para os filtros aplicados.
+                                                </td>
+                                            </tr>
+                                        )}
+                                    </tbody>
+                                </table>
+                            </div>
+                            <Pagination
+                                currentPage={currentPage}
+                                totalPages={totalPages}
+                                onPageChange={handlePageChange}
+                            />
+                        </>
                     )}
                 </CardContent>
             </Card>

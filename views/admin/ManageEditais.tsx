@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Edital, EditalModalities, EditalFormData, VacancyDetail, VacancyType, VacancyShift, CustomRequirement } from '../../types';
 import { api } from '../../services/mockApi';
@@ -11,6 +10,7 @@ import Select from '../../components/ui/Select';
 import { IconEdit, IconTrash } from '../../constants';
 import { useToast } from '../../hooks/useToast';
 import ConfirmationModal from '../../components/ui/ConfirmationModal';
+import Pagination from '../../components/ui/Pagination';
 
 const RequirementManager = ({ title, description, items, onAdd, onRemove, inputValue, onInputChange, placeholder, type }: {
     title: string;
@@ -67,6 +67,8 @@ const ManageEditais = () => {
   const [editingEdital, setEditingEdital] = useState<Edital | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const { addToast } = useToast();
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 10;
 
   const fetchEditais = () => {
     setIsLoading(true);
@@ -76,6 +78,18 @@ const ManageEditais = () => {
   useEffect(() => {
     fetchEditais();
   }, []);
+
+  const totalPages = Math.ceil(editais.length / itemsPerPage);
+  const paginatedEditais = editais.slice(
+    (currentPage - 1) * itemsPerPage,
+    currentPage * itemsPerPage
+  );
+
+  const handlePageChange = (page: number) => {
+    if (page >= 1 && page <= totalPages) {
+      setCurrentPage(page);
+    }
+  };
 
   const openModalForNew = () => {
     setEditingEdital(null);
@@ -149,11 +163,18 @@ const ManageEditais = () => {
         <Button onClick={openModalForNew}>Novo Edital</Button>
       </div>
       <Card>
-        <CardContent>
+        <CardContent className="p-0">
           {isLoading ? (
-            <Spinner />
+            <div className="p-6"><Spinner /></div>
           ) : (
-            <EditalTable editais={editais} onEdit={openModalForEdit} onDelete={openConfirmModal} onToggleActive={handleToggleActive} />
+            <>
+              <EditalTable editais={paginatedEditais} onEdit={openModalForEdit} onDelete={openConfirmModal} onToggleActive={handleToggleActive} />
+              <Pagination
+                currentPage={currentPage}
+                totalPages={totalPages}
+                onPageChange={handlePageChange}
+              />
+            </>
           )}
         </CardContent>
       </Card>
@@ -388,27 +409,46 @@ const EditalFormModal = ({ isOpen, onClose, onSave, edital }: { isOpen: boolean;
             </Button>
         </div>
 
-        <div className="grid grid-cols-2 gap-4 pt-4 border-t dark:border-slate-700">
-            <Input id="inscriptionStart" name="inscriptionStart" label="Início das Inscrições" type="date" value={formData.inscriptionStart} onChange={handleChange} />
-            <Input id="inscriptionEnd" name="inscriptionEnd" label="Fim das Inscrições" type="date" value={formData.inscriptionEnd} onChange={handleChange} />
-        </div>
-        <div className="grid grid-cols-2 gap-4">
-            <Input id="analysisStart" name="analysisStart" label="Início da Análise" type="date" value={formData.analysisStart} onChange={handleChange} />
-            <Input id="analysisEnd" name="analysisEnd" label="Fim da Análise" type="date" value={formData.analysisEnd} onChange={handleChange} />
-        </div>
-        <div className="grid grid-cols-1 gap-4">
-             <Input id="preliminaryResultDate" name="preliminaryResultDate" label="Data de Divulgação dos Resultados Preliminares" type="date" value={formData.preliminaryResultDate} onChange={handleChange} />
-        </div>
-        <div className="grid grid-cols-2 gap-4">
-            <Input id="appealStartDate" name="appealStartDate" label="Início do Período de Recursos" type="date" value={formData.appealStartDate} onChange={handleChange} />
-            <Input id="appealEndDate" name="appealEndDate" label="Fim do Período de Recursos" type="date" value={formData.appealEndDate} onChange={handleChange} />
-        </div>
-        <div className="grid grid-cols-1 gap-4">
-            <Input id="resultDate" name="resultDate" label="Data de Divulgação dos Resultados Finais" type="date" value={formData.resultDate} onChange={handleChange} />
-        </div>
-        <div className="grid grid-cols-2 gap-4">
-            <Input id="vacancyAcceptanceStartDate" name="vacancyAcceptanceStartDate" label="Início do Aceite da Vaga" type="date" value={formData.vacancyAcceptanceStartDate} onChange={handleChange} />
-            <Input id="vacancyAcceptanceDate" name="vacancyAcceptanceDate" label="Fim do Aceite da Vaga" type="date" value={formData.vacancyAcceptanceDate} onChange={handleChange} />
+        <div className="space-y-4 pt-4 border-t dark:border-slate-700">
+            <h3 className="text-lg font-medium text-cep-text dark:text-white">Datas e Prazos</h3>
+
+            {/* Inscrição */}
+            <fieldset className="p-4 border dark:border-slate-600 rounded-lg">
+                <legend className="px-2 text-sm font-medium text-cep-text dark:text-slate-200">Período de Inscrição</legend>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <Input id="inscriptionStart" name="inscriptionStart" label="Data de Início" type="date" value={formData.inscriptionStart} onChange={handleChange} />
+                    <Input id="inscriptionEnd" name="inscriptionEnd" label="Data de Fim" type="date" value={formData.inscriptionEnd} onChange={handleChange} />
+                </div>
+            </fieldset>
+
+            {/* Análise */}
+            <fieldset className="p-4 border dark:border-slate-600 rounded-lg">
+                <legend className="px-2 text-sm font-medium text-cep-text dark:text-slate-200">Período de Análise</legend>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <Input id="analysisStart" name="analysisStart" label="Data de Início" type="date" value={formData.analysisStart} onChange={handleChange} />
+                    <Input id="analysisEnd" name="analysisEnd" label="Data de Fim" type="date" value={formData.analysisEnd} onChange={handleChange} />
+                </div>
+            </fieldset>
+
+            {/* Resultados e Recursos */}
+            <fieldset className="p-4 border dark:border-slate-600 rounded-lg">
+                <legend className="px-2 text-sm font-medium text-cep-text dark:text-slate-200">Resultados e Recursos</legend>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <Input id="preliminaryResultDate" name="preliminaryResultDate" label="Resultado Preliminar" type="date" value={formData.preliminaryResultDate} onChange={handleChange} className="sm:col-span-2" />
+                    <Input id="appealStartDate" name="appealStartDate" label="Início dos Recursos" type="date" value={formData.appealStartDate} onChange={handleChange} />
+                    <Input id="appealEndDate" name="appealEndDate" label="Fim dos Recursos" type="date" value={formData.appealEndDate} onChange={handleChange} />
+                    <Input id="resultDate" name="resultDate" label="Resultado Final" type="date" value={formData.resultDate} onChange={handleChange} className="sm:col-span-2" />
+                </div>
+            </fieldset>
+            
+            {/* Aceite de Vaga */}
+            <fieldset className="p-4 border dark:border-slate-600 rounded-lg">
+                <legend className="px-2 text-sm font-medium text-cep-text dark:text-slate-200">Aceite de Vaga</legend>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <Input id="vacancyAcceptanceStartDate" name="vacancyAcceptanceStartDate" label="Data de Início" type="date" value={formData.vacancyAcceptanceStartDate} onChange={handleChange} />
+                    <Input id="vacancyAcceptanceDate" name="vacancyAcceptanceDate" label="Data de Fim" type="date" value={formData.vacancyAcceptanceDate} onChange={handleChange} />
+                </div>
+            </fieldset>
         </div>
         
         <RequirementManager
